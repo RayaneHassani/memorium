@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memorium"
+version = "1.0.0"
+description = "Claude Code sessions → a readable, searchable & annotatable HTML memory"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []          # pur stdlib — rien à résoudre
+authors = [{ name = "Rayane" }]
+
+[project.scripts]
+memorium = "export:main"
+
+[tool.setuptools]
+py-modules = ["export"]

@@ -1,0 +1,18 @@
+# Python build & packaging
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# Generated output — contains personal session data, never publish
+export/
+
+# Personal working notes & design WIP
+SUIVI.md
+*-proto.html
+*.png
