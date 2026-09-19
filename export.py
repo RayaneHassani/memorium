@@ -123,13 +123,25 @@ TAG_STRIP = re.compile(
     r"|<command-message>.*?</command-message>"
     r"|<command-args>.*?</command-args>"
     r"|<local-command-stdout>.*?</local-command-stdout>"
-    r"|<local-command-stderr>.*?</local-command-stderr>",
+    r"|<local-command-stderr>.*?</local-command-stderr>"
+    r"|<local-command-caveat>.*?</local-command-caveat>",
     re.DOTALL,
 )
 
+CMD_NAME = re.compile(r"<command-name>(.*?)</command-name>", re.DOTALL)
+CMD_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
+
+
 def clean_prompt(text):
-    text = TAG_STRIP.sub("", text)
-    return text.strip()
+    # Invocation de commande : le prompt n'est que des tags, la commande tapée est le seul contenu réel.
+    m = CMD_NAME.search(text)
+    if m:
+        cmd = m.group(1).strip()
+        a = CMD_ARGS.search(text)
+        args = a.group(1).strip() if a else ""
+        if cmd:
+            return (cmd + " " + args).strip()
+    return TAG_STRIP.sub("", text).strip()
 
 
 def prompt_title(cleaned):
