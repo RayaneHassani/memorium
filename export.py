@@ -1274,12 +1274,17 @@ async function saveMeta(){
 function cleanupSession(sid){                    // retire l'entrée si plus aucun override
   const o=META.sessions[sid]; if(o&&!o.title&&!o.folder)delete META.sessions[sid];
 }
+function refreshAll(){                           // toute mutation META touche les 3 vues
+  const s=document.getElementById("search");
+  if(s.value){s.value="";closeFind();}           // éditer = reset du contexte de recherche
+  buildEdition(); buildDashboard(); buildSidebar("");
+}
 async function moveSession(sid,id){              // déplace une session vers le dossier `id`
   const m=metaOf(sid); if(!m||effFolder(m)===id)return;
   META.sessions[sid]=META.sessions[sid]||{};
   if(id===m.project)delete META.sessions[sid].folder; else META.sessions[sid].folder=id;  // retour à l'origine = pas d'override
   cleanupSession(sid);
-  if(await saveMeta()){buildEdition();buildDashboard();}
+  if(await saveMeta())refreshAll();
 }
 function allFolderIds(){
   const s=new Set();
@@ -1307,7 +1312,7 @@ function buildEdition(){
     const head=document.createElement("div"); head.className="ed-fhead";
     const nameIn=document.createElement("input"); nameIn.className="ed-fname"; nameIn.value=folderName(id);
     nameIn.onchange=async()=>{const v=nameIn.value.trim(); if(!v){nameIn.value=folderName(id);return;}
-      META.folders[id]=Object.assign(META.folders[id]||{},{name:v}); if(await saveMeta())buildDashboard();};
+      META.folders[id]=Object.assign(META.folders[id]||{},{name:v}); if(await saveMeta())refreshAll();};
     head.appendChild(nameIn);
     const cnt=document.createElement("span"); cnt.className="ed-fcount"; cnt.textContent=sess.length+" sess"; head.appendChild(cnt);
     if(sess.length===0){                          // suppression permise seulement si le dossier est vide
@@ -1316,7 +1321,7 @@ function buildEdition(){
       del.onclick=async()=>{
         if(custom)delete META.folders[id];
         else META.folders[id]=Object.assign(META.folders[id]||{},{deleted:true});
-        if(await saveMeta()){buildEdition();buildDashboard();}
+        if(await saveMeta())refreshAll();
       };
       head.appendChild(del);
     }
@@ -1340,7 +1345,7 @@ function buildEdition(){
       ren.onclick=async()=>{const v=prompt("Nouveau titre :",effTitle(m)); if(v===null)return; const t=v.trim();
         META.sessions[m.sid]=META.sessions[m.sid]||{};
         if(t&&t!==m.title)META.sessions[m.sid].title=t; else delete META.sessions[m.sid].title;
-        cleanupSession(m.sid); if(await saveMeta()){buildEdition();buildDashboard();}};
+        cleanupSession(m.sid); if(await saveMeta())refreshAll();};
       row.appendChild(ren);
       listEl.appendChild(row);
     });
