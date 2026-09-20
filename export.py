@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Memorium — la mémoire de tes sessions Claude Code, en site HTML statique autonome.
+Memorium — the memory of your Claude Code sessions, as a standalone static HTML site.
 
-- Lit les JSONL de ~/.claude/projects (surchargeable via MEMORIUM_PROJECTS_DIR).
-- Génère index.html (dashboard, hero WebGL, recherche plein-texte) + sessions/*.js + searchindex.js.
-- Surlignage, annotations, carnet éditable ; organisation logique des dossiers/sessions
-  via data/metadata.json — la source JSONL n'est JAMAIS modifiée.
-- Zéro dépendance : stdlib uniquement. Sortie offline-first, aucun appel réseau.
+- Reads the JSONL files in ~/.claude/projects (override with MEMORIUM_PROJECTS_DIR).
+- Writes index.html (dashboard, WebGL hero, full-text search) + sessions/*.js + searchindex.js.
+- Highlights, annotations, editable notebook; logical folder and session organisation
+  through data/metadata.json — the JSONL source is NEVER modified.
+- Zero dependencies: stdlib only. Offline-first output, no network call.
 
-Usage :
-    memorium                # exporte ~/.claude/projects → ./export, ouvre le navigateur
-    memorium <dossier>      # dossier de sortie personnalisé
-    memorium serve          # sert ./export sur http://localhost:8137 (débloque l'écriture)
-    memorium archive        # sauvegarde gzip incrémentale des .jsonl hors de ~/.claude
-    memorium restore <id>   # remet une session archivée là où Claude Code la cherche
-    memorium init           # relève la rétention + installe le hook d'archivage (avec accord)
-    python export.py        # équivalent sans installation
+Usage:
+    memorium                # export ~/.claude/projects → ./export, open the browser
+    memorium <directory>    # custom output directory
+    memorium serve          # serve ./export at http://localhost:8137 (unlocks writing)
+    memorium archive        # incremental gzip backup of the JSONL files outside ~/.claude
+    memorium restore <id>   # put an archived session back where Claude Code looks for it
+    memorium init           # raise retention + install the archiving hook (with consent)
+    python export.py        # same thing without installing
 """
 
 import sys, os, json, re, html, glob, gzip, shutil, webbrowser, datetime
 
-# Source des sessions : ~/.claude/projects par défaut, surchargeable (démo, tests, CI)
+# Session source: ~/.claude/projects by default, overridable (demo, tests, CI)
 PROJECTS_DIR = os.environ.get("MEMORIUM_PROJECTS_DIR") or os.path.join(os.path.expanduser("~"), ".claude", "projects")
 
-# Archive des .jsonl bruts : hors de ~/.claude, que Claude Code purge au-delà de cleanupPeriodDays.
+# Raw JSONL archive: outside ~/.claude, which Claude Code prunes past cleanupPeriodDays.
 ARCHIVE_DIR = os.environ.get("MEMORIUM_ARCHIVE_DIR") or os.path.join(os.path.expanduser("~"), ".memorium", "archive")
 
-# ─────────────────────────── Découverte des sessions ───────────────────────────
+# ─────────────────────────── Session discovery ───────────────────────────
 
 def scan_meta(path):
-    """Extrait (titre, nb prompts) d'un transcript via préfiltre sous-chaîne."""
+    """Pull (title, prompt count) from a transcript using a cheap substring prefilter."""
     title, prompts = None, 0
     try:
         with open(path, encoding="utf-8") as f:
@@ -57,14 +57,14 @@ def scan_meta(path):
 
 
 def clean_input(s):
-    """Retire espaces + BOM/zero-width (artefacts de pipe) en début/fin."""
+    """Strip whitespace and BOM/zero-width characters (pipe artefacts) at both ends."""
     return re.sub(r'^[\s﻿​]+|[\s﻿​]+$', '', s)
 
 
 def discover_sessions(deep=50):
-    """Liste les sessions triées par date ; deep-scan (titre + nb prompts) des `deep` plus récentes."""
+    """List sessions sorted by date; deep-scan (title + prompt count) the `deep` most recent ones."""
     paths = glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl"))
-    paths.sort(key=os.path.getmtime, reverse=True)  # tri cheap d'abord
+    paths.sort(key=os.path.getmtime, reverse=True)  # cheap sort first
     sessions = []
     for i, path in enumerate(paths):
         proj = os.path.basename(os.path.dirname(path))
@@ -77,7 +77,7 @@ def discover_sessions(deep=50):
             "path": path,
             "project": pretty_project(proj),
             "sid": sid,
-            "title": title or "(sans titre)",
+            "title": title or "(untitled)",
             "prompts": prompts,
             "mtime": os.path.getmtime(path),
         })
@@ -85,7 +85,7 @@ def discover_sessions(deep=50):
 
 
 def pretty_project(encoded):
-    """C--Users-Rayane-Desktop-...-portfolio -> portfolio (dernier segment)."""
+    """C--Users-me-Desktop-...-portfolio -> portfolio (last segment)."""
     parts = encoded.replace("C--", "").split("-")
     parts = [p for p in parts if p]
     return parts[-1] if parts else encoded
@@ -93,9 +93,9 @@ def pretty_project(encoded):
 
 def choose_session(sessions):
     if not sessions:
-        print("Aucune session trouvée dans", PROJECTS_DIR)
+        print("No session found in", PROJECTS_DIR)
         sys.exit(1)
-    print("\n  Conversations disponibles :\n")
+    print("\n  Available conversations:\n")
     show = sessions[:40]
     for i, s in enumerate(show, 1):
         d = datetime.datetime.fromtimestamp(s["mtime"]).strftime("%d %b %H:%M")
@@ -103,25 +103,25 @@ def choose_session(sessions):
         print(f"  [{i:>2}] {s['project']:<14} {d:<13} {p}  {s['title'][:50]}")
     print()
     while True:
-        raw = clean_input(input("  Numéro à exporter (q pour quitter) : "))
+        raw = clean_input(input("  Number to export (q to quit): "))
         if raw.lower() in ("q", "quit", "exit"):
             sys.exit(0)
         if raw.isdigit() and 1 <= int(raw) <= len(show):
             return show[int(raw) - 1]
-        print("  Choix invalide.")
+        print("  Invalid choice.")
 
 
 def resolve_arg(arg):
-    """Argument = chemin .jsonl OU id de session (cherché dans les projets)."""
+    """Argument is either a .jsonl path or a session id (looked up in the projects)."""
     if os.path.isfile(arg):
         return arg
     matches = glob.glob(os.path.join(PROJECTS_DIR, "*", f"{arg}*.jsonl"))
     if matches:
         return matches[0]
-    print(f"Session introuvable : {arg}")
+    print(f"Session not found: {arg}")
     sys.exit(1)
 
-# ─────────────────────────── Parsing du transcript ───────────────────────────
+# ─────────────────────────── Transcript parsing ───────────────────────────
 
 TAG_STRIP = re.compile(
     r"<system-reminder>.*?</system-reminder>"
@@ -139,7 +139,7 @@ CMD_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
 
 
 def clean_prompt(text):
-    # Invocation de commande : le prompt n'est que des tags, la commande tapée est le seul contenu réel.
+    # Command invocation: the prompt is nothing but tags, the typed command is the only real content.
     m = CMD_NAME.search(text)
     if m:
         cmd = m.group(1).strip()
@@ -151,7 +151,7 @@ def clean_prompt(text):
 
 
 def prompt_title(cleaned):
-    """Titre de section = 1re ligne signifiante du prompt, nettoyée et tronquée."""
+    """Section title: first meaningful line of the prompt, cleaned and truncated."""
     for line in cleaned.splitlines():
         s = line.strip()
         if not s:
@@ -167,7 +167,7 @@ def prompt_title(cleaned):
 
 
 def result_text(block):
-    """Extrait le texte d'un tool_result (content str ou liste de blocs text)."""
+    """Extract the text of a tool_result (string content or list of text blocks)."""
     c = block.get("content")
     if isinstance(c, str):
         return c
@@ -192,21 +192,21 @@ def parse(path):
             except Exception:
                 pass
 
-    # titre de page = ai-title (stable sur toute la session ; ne titre PAS les sections).
+    # Page title = ai-title (stable across the session; it does NOT title the sections).
     page_title = None
     for o in raw:
         if o.get("type") == "ai-title" and o.get("aiTitle"):
             page_title = o["aiTitle"]
 
-    # Dossier de travail de la session : `claude --resume` est scopé au cwd, l'ID seul ne suffit pas.
-    # Le nom encodé du dossier projet est lossy (tirets ambigus), seul ce champ donne le chemin réel.
+    # Session working directory: `claude --resume` is scoped to the cwd, the id alone is not enough.
+    # The encoded project folder name is lossy (ambiguous dashes); only this field gives the real path.
     cwd = ""
     for o in raw:
         if o.get("cwd"):
             cwd = o["cwd"]
             break
 
-    # map tool_use_id -> texte de résultat
+    # map tool_use_id -> result text
     results = {}
     for o in raw:
         if o.get("type") != "user":
@@ -243,10 +243,10 @@ def parse(path):
                         cur["blocks"].append({"kind": "interrupt", "text": cleaned})
                     continue
                 ensure_section("", cleaned)
-            # les user-list = tool_result, déjà consommés via results
+            # user-list entries are tool_result blocks, already consumed through `results`
         elif t == "assistant":
             if cur is None:
-                # réponse avant tout prompt (rare) — section d'amorce
+                # assistant reply before any prompt (rare) — opening section
                 ensure_section("", "")
             c = o.get("message", {}).get("content")
             if not isinstance(c, list):
@@ -259,17 +259,17 @@ def parse(path):
                     txt = b.get("text", "").strip()
                     if txt:
                         cur["blocks"].append({"kind": "text", "text": txt})
-                # thinking : volontairement exclu
+                # thinking blocks: deliberately excluded
                 elif bt == "tool_use":
                     cur["blocks"].append(render_tool(b, results))
 
     return {
-        "title": page_title or "Conversation Claude Code",
+        "title": page_title or "Claude Code conversation",
         "cwd": cwd,
         "sections": [s for s in sections if s["blocks"] or s["prompt"]],
     }
 
-# ─────────────────────────── Formatage des outils ───────────────────────────
+# ─────────────────────────── Tool formatting ───────────────────────────
 
 NOISE_TOOLS = {"TaskCreate", "TaskUpdate", "TodoWrite", "TaskList", "TaskGet",
                "TaskOutput", "TaskStop", "ToolSearch"}
@@ -292,53 +292,53 @@ def render_tool(b, results):
     if name in NOISE_TOOLS:
         return {"kind": "skip"}
 
-    # Édition de code : EN-TÊTE SEUL, jamais le contenu
+    # Code edits: HEADER ONLY, never the content
     if name in ("Edit", "MultiEdit"):
-        return {"kind": "tool", "icon": "✎", "label": f"a édité {basename(inp.get('file_path'))}"}
+        return {"kind": "tool", "icon": "✎", "label": f"edited {basename(inp.get('file_path'))}"}
     if name == "Write":
-        return {"kind": "tool", "icon": "✚", "label": f"a créé {basename(inp.get('file_path'))}"}
+        return {"kind": "tool", "icon": "✚", "label": f"created {basename(inp.get('file_path'))}"}
     if name == "NotebookEdit":
-        return {"kind": "tool", "icon": "✎", "label": f"a édité le notebook {basename(inp.get('notebook_path'))}"}
+        return {"kind": "tool", "icon": "✎", "label": f"edited notebook {basename(inp.get('notebook_path'))}"}
 
-    # Lecture / recherche : en-tête seul (renvoient du code)
+    # Reads and searches: header only (they return code)
     if name == "Read":
-        return {"kind": "tool", "icon": "▤", "label": f"a lu {basename(inp.get('file_path'))}"}
+        return {"kind": "tool", "icon": "▤", "label": f"read {basename(inp.get('file_path'))}"}
     if name == "Grep":
         n = count_lines(rtext)
         pat = inp.get("pattern", "")
-        return {"kind": "tool", "icon": "⌕", "label": f"a cherché «{pat}» — {n} résultat{'s' if n != 1 else ''}"}
+        return {"kind": "tool", "icon": "⌕", "label": f"searched “{pat}” — {n} result{'s' if n != 1 else ''}"}
     if name == "Glob":
-        return {"kind": "tool", "icon": "⌕", "label": f"a listé {inp.get('pattern','')}"}
+        return {"kind": "tool", "icon": "⌕", "label": f"listed {inp.get('pattern','')}"}
 
-    # Bash : commande + sortie (repliée si longue)
+    # Bash: command + output (collapsed when long)
     if name == "Bash":
         cmd = (inp.get("command") or "").strip()
         desc = (inp.get("description") or "").strip()
         return {"kind": "bash", "cmd": cmd, "desc": desc, "out": rtext, "err": err}
 
-    # Agent / délégation
+    # Agent / delegation
     if name in ("Agent", "Task"):
         sub = inp.get("subagent_type", "agent")
         desc = inp.get("description", "")
-        return {"kind": "agent", "label": f"a délégué à l'agent « {sub} » : {desc}", "out": rtext}
+        return {"kind": "agent", "label": f"delegated to the {sub} agent: {desc}", "out": rtext}
 
     # Plan
     if name == "ExitPlanMode":
         return {"kind": "plan", "text": inp.get("plan", "")}
 
-    # Questions à l'utilisateur
+    # Questions asked to the user
     if name == "AskUserQuestion":
         qs = inp.get("questions", [])
         return {"kind": "ask", "questions": qs, "answer": rtext}
 
-    # Doc / web / MCP : en-tête générique
+    # Doc / web / MCP: generic header
     if name.startswith("mcp__") or name in ("WebFetch", "WebSearch"):
         q = inp.get("query") or inp.get("url") or inp.get("libraryName") or ""
         short = name.split("__")[-1]
         return {"kind": "tool", "icon": "◷", "label": f"{short} {q}".strip()}
 
-    # Fallback générique
-    return {"kind": "tool", "icon": "•", "label": f"a utilisé {name}"}
+    # Generic fallback
+    return {"kind": "tool", "icon": "•", "label": f"used {name}"}
 
 # ─────────────────────────── Markdown -> HTML (mini) ───────────────────────────
 
@@ -354,7 +354,7 @@ def inline_md(s):
     return s
 
 def md_to_html(text):
-    """Convertisseur Markdown minimal mais robuste (titres, listes, code, citations)."""
+    """Minimal but sturdy Markdown converter (headings, lists, code, quotes)."""
     lines = text.split("\n")
     out = []
     i = 0
@@ -367,7 +367,7 @@ def md_to_html(text):
 
     while i < len(lines):
         ln = lines[i]
-        # bloc de code ```
+        # fenced code block
         if ln.lstrip().startswith("```"):
             close_lists()
             lang = ln.lstrip()[3:].strip()
@@ -379,7 +379,7 @@ def md_to_html(text):
             cls = f' class="lang-{esc(lang)}"' if lang else ""
             out.append(f'<pre class="code"><code{cls}>{esc(chr(10).join(buf))}</code></pre>')
             continue
-        # tableau GFM : ligne à pipes suivie d'une ligne séparatrice (|---|---|)
+        # GFM table: a pipe row followed by a separator row (|---|---|)
         if "|" in ln and i + 1 < len(lines) and re.match(
             r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$", lines[i + 1]
         ):
@@ -408,14 +408,14 @@ def md_to_html(text):
             tbody = "".join(f"<tr>{row_html('td', r)}</tr>" for r in body)
             out.append(f'<div class="tbl-wrap"><table>{thead}<tbody>{tbody}</tbody></table></div>')
             continue
-        # titres
+        # headings
         m = re.match(r"^(#{1,6})\s+(.*)$", ln)
         if m:
             close_lists()
-            lvl = min(len(m.group(1)) + 2, 6)  # décale: # devient h3 (h1/h2 réservés à la page)
+            lvl = min(len(m.group(1)) + 2, 6)  # shift down: # becomes h3 (h1/h2 belong to the page)
             out.append(f"<h{lvl}>{inline_md(m.group(2).strip())}</h{lvl}>")
             i += 1; continue
-        # citation
+        # blockquote
         if ln.startswith(">"):
             close_lists()
             buf = []
@@ -423,25 +423,25 @@ def md_to_html(text):
                 buf.append(lines[i][1:].lstrip()); i += 1
             out.append(f"<blockquote>{inline_md(chr(10).join(buf))}</blockquote>")
             continue
-        # liste ordonnée
+        # ordered list
         m = re.match(r"^\s*\d+\.\s+(.*)$", ln)
         if m:
             if not in_ol: close_lists(); out.append("<ol>"); in_ol = True
             out.append(f"<li>{inline_md(m.group(1))}</li>")
             i += 1; continue
-        # liste à puces
+        # bullet list
         m = re.match(r"^\s*[-*+]\s+(.*)$", ln)
         if m:
             if not in_ul: close_lists(); out.append("<ul>"); in_ul = True
             out.append(f"<li>{inline_md(m.group(1))}</li>")
             i += 1; continue
-        # séparateur
+        # horizontal rule
         if re.match(r"^\s*---+\s*$", ln):
             close_lists(); out.append("<hr>"); i += 1; continue
-        # ligne vide
+        # blank line
         if not ln.strip():
             close_lists(); i += 1; continue
-        # paragraphe (fusionne lignes consécutives)
+        # paragraph (merges consecutive lines)
         close_lists()
         buf = [ln]
         i += 1
@@ -453,14 +453,14 @@ def md_to_html(text):
     close_lists()
     return "\n".join(out)
 
-# ─────────────────────────── Rendu HTML ───────────────────────────
+# ─────────────────────────── HTML rendering ───────────────────────────
 
 def slug(i):
     return f"prompt-{i}"
 
 def render_blocks(blocks, sidx):
-    """Rend les blocs d'une section. Les conteneurs de texte reçoivent data-bid
-    (annotables : surlignage / commentaires côté client)."""
+    """Render the blocks of a section. Text containers get a data-bid
+    (annotatable: client-side highlights and comments)."""
     parts = []
     bc = [0]
     def bid():
@@ -507,7 +507,7 @@ def render_blocks(blocks, sidx):
             )
         elif k == "plan":
             parts.append(
-                f'<div class="plan"><div class="plan-head">Plan proposé</div>'
+                f'<div class="plan"><div class="plan-head">Proposed plan</div>'
                 f'<div class="prose anno" data-bid="{bid()}">{md_to_html(b["text"])}</div></div>'
             )
         elif k == "ask":
@@ -523,7 +523,7 @@ def render_blocks(blocks, sidx):
                 )
             ans = esc(b.get("answer", "")[:1200])
             parts.append(
-                '<details class="ask" open><summary>Questions posées</summary>'
+                '<details class="ask" open><summary>Questions asked</summary>'
                 + "".join(qhtml)
                 + (f'<div class="q-answer anno" data-bid="{bid()}">{ans}</div>' if ans else "")
                 + "</details>"
@@ -532,8 +532,8 @@ def render_blocks(blocks, sidx):
 
 
 def render_session_inner(data, date_str):
-    """Rend le CORPS d'une session : entête + TOC interne + sections.
-    Retourné comme une string HTML (montée dynamiquement dans le viewer)."""
+    """Render the BODY of a session: header + inner TOC + sections.
+    Returned as an HTML string (mounted dynamically in the viewer)."""
     title = data["title"]
     sections = data["sections"]
 
@@ -572,7 +572,7 @@ def render_session_inner(data, date_str):
         "count": len(sections),
     }
 
-# ─────────────────────────── Template (CSS Anthropic inline) ───────────────────────────
+# ─────────────────────────── Template (inline CSS) ───────────────────────────
 
 INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="fr">
@@ -604,7 +604,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     display:flex;align-items:center;gap:20px;padding:0 22px;
     background:rgba(246,237,220,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);}
   .nav-brand{display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:700;font-size:15px;letter-spacing:-.01em;}
-  /* marque Memorium : ruban ondulé (courbe + flèche + 2 nœuds alternés), SVG */
+  /* Memorium mark: rippling ribbon (curve + arrow + 2 alternating nodes), SVG */
   .brand-svg{display:inline-block;vertical-align:middle;}
   .nav-brand .brand-svg{width:34px;height:auto;}
   .nav-brand:hover{color:var(--accent-d);}
@@ -640,7 +640,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .pcard .pnotes{position:absolute;top:14px;right:14px;background:var(--accent2);color:#fff;font-size:11px;
     border-radius:20px;padding:2px 9px;font-weight:700;}
 
-  /* ───── Carnet éditable ───── */
+  /* ───── Editable notebook ───── */
   .cn-layout{display:flex;height:calc(100vh - var(--nav-h));}
   .cn-source{flex:0 0 380px;max-width:44%;overflow-y:auto;padding:20px 18px 60px;border-right:1px solid var(--line);background:var(--panel);}
   .cn-src-hint{font-size:11.5px;color:var(--muted);font-style:italic;line-height:1.5;padding:2px 2px 10px;border-bottom:1px dashed var(--line);margin-bottom:6px;}
@@ -907,21 +907,21 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .tbl-wrap tbody tr:hover{background:rgba(0,0,0,.02);}
   .tbl-wrap code{white-space:nowrap;}
 
-  /* ═══════ Welcome / hero ruban-mémoire WebGL ═══════ */
+  /* ═══════ Welcome / WebGL memory-ribbon hero ═══════ */
   #view-welcome{padding-top:0;}
   #view-welcome.active{display:flex;align-items:center;justify-content:center;min-height:100vh;}
-  /* fond du welcome : quadrillage léger + vignettage de profondeur */
+  /* welcome background: light grid + depth vignette */
   body.welcome::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
     background:
       radial-gradient(130% 100% at 50% 40%,transparent 0 48%,rgba(86,99,64,.13) 100%),
       repeating-linear-gradient(0deg,rgba(86,99,64,.05) 0 1px,transparent 1px 38px),
       repeating-linear-gradient(90deg,rgba(86,99,64,.05) 0 1px,transparent 1px 38px);}
   .welcome-inner{position:relative;z-index:1;text-align:center;width:100%;padding:20px;}
-  /* bande 3D large en haut, titre tapé dessous */
+  /* wide 3D ribbon on top, title typed underneath */
   .hero-stage{position:relative;width:min(1460px,98vw);height:300px;margin:0 auto -6px;}
   #gl{position:absolute;inset:0;width:100%;height:100%;display:block;}
   #glfail{display:none;color:var(--muted);font-size:13px;padding:40px;}
-  /* signature : barre de recherche qui tape une requête, un nœud répond */
+  /* signature move: a search bar types a query, a node answers */
   .searchbar{position:absolute;left:50%;top:2%;transform:translateX(-50%);z-index:2;
     display:flex;align-items:center;gap:10px;min-width:240px;
     background:rgba(246,237,220,.7);backdrop-filter:blur(9px);
@@ -932,11 +932,11 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .searchbar .q{white-space:nowrap;}
   .searchbar .scaret{display:inline-block;width:.5ch;height:1.05em;background:var(--accent);
     vertical-align:-.15em;animation:caret 1s step-end infinite;}
-  /* étiquettes de commit projetées sur les nœuds : la bande devient un git log vivant */
+  /* commit labels projected onto the nodes: the ribbon becomes a living git log */
   .nlabel{position:absolute;left:0;top:0;z-index:2;font:10.5px/1.3 var(--mono);
     color:var(--ink);white-space:nowrap;pointer-events:none;opacity:0;
     transform:translate(-50%,-50%);
-    /* halo couleur papier (casing carto) : lisible même posé sur la bande */
+    /* paper-coloured halo (map casing): readable even on top of the ribbon */
     text-shadow:0 0 3px var(--paper),0 0 3px var(--paper),0 0 5px var(--paper),0 0 8px var(--paper);}
   .nlabel .h{color:var(--accent-d);opacity:.85;letter-spacing:.02em;}
   .nlabel.hit{font-weight:700;
@@ -964,7 +964,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     .welcome-inner .wsub,.enter-btn,.welcome-inner .wnote{animation:none!important;opacity:1;transform:none;}
   }
 
-  /* ═══════ Résultats de recherche plein-texte ═══════ */
+  /* ═══════ Full-text search results ═══════ */
   .sr-head{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
     font-weight:700;margin:2px 2px 11px;}
   .sr-none{color:var(--muted);font-size:12.5px;text-align:center;padding:34px 12px;line-height:1.7;}
@@ -995,7 +995,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   #findbar .fpos b{color:var(--accent);}
   #findbar .fclose{font-size:13px;}
 
-  /* ═══════ Lisibilité ═══════ */
+  /* ═══════ Readability ═══════ */
   .prose{font-size:14px;}
   .prose h3{margin-top:1.7em;}
 </style>
@@ -1005,8 +1005,8 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   <div class="nav-brand" id="navHome"><svg class="brand-svg" viewBox="0 0 48 24" fill="none" aria-hidden="true"><path d="M3 12 C9 5.5, 15 18.5, 22 12 C29 5.5, 34 16.5, 40 12" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round"/><path d="M40 8.5 L45 12 L40 15.5" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 8.5 V6" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="11" cy="4.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/><path d="M30 14.5 V17.5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="30" cy="19.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/></svg>Memorium</div>
   <div class="nav-tabs">
     <button data-view="dash" class="active">Dashboard</button>
-    <button data-view="carnet">Carnet</button>
-    <button data-view="edition">Edition</button>
+    <button data-view="carnet">Notebook</button>
+    <button data-view="edition">Organize</button>
     <button data-view="manual">Manual</button>
   </div>
   <span class="dirpill" id="dirpill"></span>
@@ -1019,16 +1019,16 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
       <div class="searchbar" id="sbar"><span class="mag">⌕</span><span class="q" id="sq"></span><span class="scaret"></span></div>
     </div>
     <h1 id="wTitle"></h1>
-    <p class="wsub">La mémoire vivante de tes sessions Claude&nbsp;Code — relis, cherche, annote.</p>
-    <button id="enterBtn" class="enter-btn">Ouvrir le journal →</button>
-    <div class="wnote">__COUNT__ conversations indexées</div>
+    <p class="wsub">The living memory of your Claude&nbsp;Code sessions &mdash; reread, search, annotate.</p>
+    <button id="enterBtn" class="enter-btn">Open the journal →</button>
+    <div class="wnote">__COUNT__ conversations indexed</div>
   </div>
 </section>
 
 <section id="view-dash" class="view">
   <div class="dash-hero">
     <h1><svg class="brand-svg" viewBox="0 0 48 24" fill="none" aria-hidden="true"><path d="M3 12 C9 5.5, 15 18.5, 22 12 C29 5.5, 34 16.5, 40 12" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round"/><path d="M40 8.5 L45 12 L40 15.5" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 8.5 V6" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="11" cy="4.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/><path d="M30 14.5 V17.5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="30" cy="19.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/></svg>Memorium</h1>
-    <p>__COUNT__ conversations · la mémoire de tes sessions Claude Code</p>
+    <p>__COUNT__ conversations · the memory of your Claude Code sessions</p>
     <div class="accent-rule"></div>
   </div>
   <div id="dash-grid" class="dash-grid"></div>
@@ -1039,14 +1039,14 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     <aside id="sidebar">
       <div id="side-resizer" title="Glisser pour redimensionner"></div>
       <div id="side-inner">
-        <input id="search" placeholder="Rechercher un mot ou une expression…" autocomplete="off">
+        <input id="search" placeholder="Search for a word or a phrase…" autocomplete="off">
         <div id="sesslist"></div>
       </div>
     </aside>
     <main>
       <div id="emptyread">
-        <div class="big">Choisis une session à gauche</div>
-        <div>Sélectionne du texte pour <b>surligner</b> / <b>commenter</b> · <kbd>j</kbd>/<kbd>k</kbd> navigue entre prompts.</div>
+        <div class="big">Pick a session on the left</div>
+        <div>Select text to <b>highlight</b> or <b>comment</b> · <kbd>j</kbd>/<kbd>k</kbd> moves between prompts.</div>
       </div>
       <div id="viewer"></div>
     </main>
@@ -1058,10 +1058,10 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     <div class="cn-source" id="cn-source"></div>
     <div class="cn-editor">
       <div class="cn-etop">
-        <span class="cn-title">Carnet</span>
+        <span class="cn-title">Notebook</span>
         <span class="cn-status" id="cn-status"></span>
       </div>
-      <textarea id="cn-text" spellcheck="false" placeholder="Écris ici. Glisse une annotation depuis la gauche pour l'insérer en citation."></textarea>
+      <textarea id="cn-text" spellcheck="false" placeholder="Write here. Drag an annotation from the left to insert it as a quote."></textarea>
     </div>
   </div>
 </section>
@@ -1135,11 +1135,11 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <section id="view-edition" class="view">
   <div class="ed-wrap">
     <div class="ed-head">
-      <h1>Edition</h1>
-      <p>Renomme dossiers et sessions, glisse une session vers un autre dossier. Rien ne bouge dans <code>~/.claude/projects</code> — tout est enregistré dans <code>data/metadata.json</code>.</p>
+      <h1>Organize</h1>
+      <p>Rename folders and sessions, drag a session into another folder. Nothing moves inside <code>~/.claude/projects</code> &mdash; everything is stored in <code>data/metadata.json</code>.</p>
       <div class="accent-rule"></div>
     </div>
-    <div id="ed-toolbar"><button id="ed-newfolder">＋ Nouveau dossier</button></div>
+    <div id="ed-toolbar"><button id="ed-newfolder">＋ New folder</button></div>
     <div id="ed-body"></div>
   </div>
 </section>
@@ -1160,10 +1160,10 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 </div>
 <div id="findbar">
   <span class="fq" id="findq"></span>
-  <button id="findprev" title="Précédent">‹</button>
+  <button id="findprev" title="Previous">‹</button>
   <span class="fpos"><b id="fcur">0</b>/<span id="ftot">0</span></span>
-  <button id="findnext" title="Suivant">›</button>
-  <button id="findclose" class="fclose" title="Fermer">✕</button>
+  <button id="findnext" title="Next">›</button>
+  <button id="findclose" class="fclose" title="Close">✕</button>
 </div>
 
 <script src="searchindex.js"></script>
@@ -1171,7 +1171,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 const MANIFEST = __MANIFEST__;
 const cache = {};
 let curSid=null, anns=[], pendingSid=null, curView="dash", afterMountAid=null, curProject=null;
-let META={folders:{},sessions:{}};   // overrides chargés depuis data/metadata.json (couche dérivée, jamais la source)
+let META={folders:{},sessions:{}};   // overrides loaded from data/metadata.json (derived layer, never the source)
 const viewer=document.getElementById("viewer");
 const emptyread=document.getElementById("emptyread");
 
@@ -1205,17 +1205,17 @@ let rootDir=null;                              // handle du dossier export/
 const FS_OK=("showDirectoryPicker" in window); // faux sur Firefox/Safari
 
 async function connectDir(){
-  if(!FS_OK){alert("Écriture disque non supportée — utilise Chrome/Edge.");return false;}
+  if(!FS_OK){alert("Disk writing is not supported — use Chrome or Edge.");return false;}
   rootDir=await window.showDirectoryPicker({mode:"readwrite"});
   await idbSet(HKEY,rootDir); updateDirPill(); await initStore(); return true;
 }
-async function restoreDir(){                    // au chargement : réutilise le handle mémorisé
+async function restoreDir(){                    // on load: reuse the stored handle
   if(!FS_OK){updateDirPill();return;}
   const h=await idbGet(HKEY); if(!h){updateDirPill();return;}
   if(await h.queryPermission({mode:"readwrite"})==="granted"){rootDir=h;updateDirPill();await initStore();}
   else updateDirPill();                          // permission perdue → bouton "Reconnecter"
 }
-async function reconnectDir(){                   // re-demande la permission (1 geste imposé par l'API)
+async function reconnectDir(){                   // ask for permission again (one gesture, required by the API)
   const h=await idbGet(HKEY); if(!h)return connectDir();
   if(await h.requestPermission({mode:"readwrite"})==="granted"){rootDir=h;updateDirPill();await initStore();return true;}
   return false;
@@ -1226,27 +1226,27 @@ async function readData(name){
   try{return await (await (await d.getFileHandle(name)).getFile()).text();}catch(e){return null;}
 }
 async function writeData(name,text){
-  const d=await dataDir(); if(!d)throw new Error("Dossier non connecté");
+  const d=await dataDir(); if(!d)throw new Error("Folder not connected");
   const w=await (await d.getFileHandle(name,{create:true})).createWritable();
   await w.write(text); await w.close();
 }
-async function initStore(){                      // charge metadata.json → META, puis rafraîchit
+async function initStore(){                      // load metadata.json into META, then refresh
   if(!rootDir)return;
   let meta=await readData("metadata.json");
   if(meta===null){await writeData("metadata.json","{}\n");meta="{}";}
   try{const j=JSON.parse(meta); META={folders:j.folders||{},sessions:j.sessions||{}};}
-  catch(e){console.warn("metadata.json illisible, ignoré",e);}
+  catch(e){console.warn("metadata.json unreadable, ignored",e);}
   buildDashboard();
   if(curView==="carnet") buildCarnet();
   if(curView==="read") buildSidebar("");
   if(curSid) document.querySelectorAll(".sess").forEach(e=>e.classList.toggle("active",e.dataset.sid===curSid));
-  console.log("[memorium] store OK —",Object.keys(META.folders).length,"dossiers,",Object.keys(META.sessions).length,"sessions modifiées");
+  console.log("[memorium] store OK —",Object.keys(META.folders).length,"folders,",Object.keys(META.sessions).length,"sessions modified");
 }
 function updateDirPill(){
   const el=document.getElementById("dirpill"); if(!el)return;
-  if(!FS_OK){el.textContent="Écriture indispo (Chrome/Edge)";el.className="dirpill off";el.onclick=null;return;}
-  if(rootDir){el.textContent="● Dossier connecté";el.className="dirpill on";el.onclick=null;}
-  else{el.textContent="○ Connecter le dossier export";el.className="dirpill";
+  if(!FS_OK){el.textContent="Writing unavailable (Chrome/Edge)";el.className="dirpill off";el.onclick=null;return;}
+  if(rootDir){el.textContent="● Folder connected";el.className="dirpill on";el.onclick=null;}
+  else{el.textContent="○ Connect the export folder";el.className="dirpill";
        el.onclick=async()=>{(await idbGet(HKEY))?reconnectDir():connectDir();};}
 }
 
@@ -1301,7 +1301,7 @@ function openProject(proj){
   if(sess.length)openSession(sess[0].sid);
 }
 
-/* ───── Carnet éditable : gauche = source draggable, droite = éditeur → carnet.md ───── */
+/* ───── Editable notebook: left = draggable source, right = editor → notebook.md ───── */
 let cnTimer=null, cnLoaded=false;
 function cnSnippetAnn(m,a){                       // annotation → citation + lien retour
   let s="\n> « "+(a.quote||"").trim()+" »\n";
@@ -1313,22 +1313,25 @@ function cnSnippetSess(m){ return "\n— ["+effTitle(m)+"](session:"+m.sid+")\n"
 function cnStatus(state){
   const el=document.getElementById("cn-status"); if(!el)return;
   el.className="cn-status"+(state==="saved"?" ok":state==="error"?" err":"");
-  el.textContent=state==="saving"?"✎ enregistrement…":state==="saved"?"✓ enregistré":state==="error"?"✗ écriture impossible":"";
+  el.textContent=state==="saving"?"✎ saving…":state==="saved"?"✓ saved":state==="error"?"✗ write failed":"";
 }
 function cnSchedule(){ clearTimeout(cnTimer); cnStatus("saving"); cnTimer=setTimeout(cnFlush,600); }
-async function cnFlush(){                         // écrit carnet.md ; appelé au débounce ET au changement de vue
+async function cnFlush(){                         // writes notebook.md; called on debounce AND on view change
   clearTimeout(cnTimer); cnTimer=null;
   const ta=document.getElementById("cn-text"); if(!ta||!rootDir)return;
-  try{await writeData("carnet.md",ta.value); cnStatus("saved");}
+  try{await writeData("notebook.md",ta.value); cnStatus("saved");}
   catch(e){cnStatus("error");}
 }
 function buildCarnet(){
   const src=document.getElementById("cn-source"); src.innerHTML="";
   const ta=document.getElementById("cn-text"); ta.oninput=cnSchedule;
-  // charge carnet.md une seule fois ; le flush au changement de vue protège les frappes non sauvées
-  if(rootDir && !cnLoaded){ cnLoaded=true; readData("carnet.md").then(t=>{ if(t!==null) ta.value=t; }); }
+  // load the notebook once; the flush on view change protects unsaved keystrokes
+  // Migration: exports predating the rename hold a carnet.md — adopt it once, losing nothing.
+  if(rootDir && !cnLoaded){ cnLoaded=true; readData("notebook.md").then(async t=>{
+    if(t===null){ const old=await readData("carnet.md"); if(old!==null){ t=old; await writeData("notebook.md",old); } }
+    if(t!==null) ta.value=t; }); }
   const hint=document.createElement("div"); hint.className="cn-src-hint";
-  hint.textContent=rootDir?"Glisse une annotation ou une session dans l'éditeur →":"Connecte le dossier export (pastille en haut à droite) pour enregistrer ton carnet.";
+  hint.textContent=rootDir?"Drag an annotation or a session into the editor →":"Connect the export folder (pill in the top right) to save your notebook.";
   src.appendChild(hint);
   const g=projectGroups();
   const order=Object.keys(g).sort((a,b)=>Math.max(...g[b].map(s=>s.mtime))-Math.max(...g[a].map(s=>s.mtime)));
@@ -1360,7 +1363,7 @@ function buildCarnet(){
     });
     src.appendChild(pd);
   });
-  if(!total){const e=document.createElement("div");e.className="cn-empty";e.innerHTML="Aucune annotation pour l'instant.<br>Surligne un passage dans une session pour la voir apparaître ici.";src.appendChild(e);}
+  if(!total){const e=document.createElement("div");e.className="cn-empty";e.innerHTML="No annotations yet.<br>Highlight a passage in a session to see it appear here.";src.appendChild(e);}
 }
 function gotoAnn(sid,aid){
   afterMountAid=aid;
@@ -1376,43 +1379,43 @@ function flashAnn(aid){
 
 /* ───── Edition : dossiers & sessions (couche metadata.json) ───── */
 async function saveMeta(){
-  if(!rootDir){alert("Connecte d'abord le dossier export (pastille en haut à droite).");return false;}
+  if(!rootDir){alert("Connect the export folder first (pill in the top right).");return false;}
   try{await writeData("metadata.json",JSON.stringify(META,null,2));return true;}
-  catch(e){alert("Écriture impossible : "+e.message);return false;}
+  catch(e){alert("Write failed: "+e.message);return false;}
 }
-function cleanupSession(sid){                    // retire l'entrée si plus aucun override
+function cleanupSession(sid){                    // drop the entry once no override is left
   const o=META.sessions[sid]; if(o&&!o.title&&!o.folder)delete META.sessions[sid];
 }
-function refreshAll(){                           // toute mutation META touche les 3 vues
+function refreshAll(){                           // any META mutation affects all three views
   const s=document.getElementById("search");
-  if(s.value){s.value="";closeFind();}           // éditer = reset du contexte de recherche
+  if(s.value){s.value="";closeFind();}           // editing resets the search context
   buildEdition(); buildDashboard(); buildSidebar("");
 }
-async function moveSession(sid,id){              // déplace une session vers le dossier `id`
+async function moveSession(sid,id){              // move a session into folder `id`
   const m=metaOf(sid); if(!m||effFolder(m)===id)return;
   META.sessions[sid]=META.sessions[sid]||{};
-  if(id===m.project)delete META.sessions[sid].folder; else META.sessions[sid].folder=id;  // retour à l'origine = pas d'override
+  if(id===m.project)delete META.sessions[sid].folder; else META.sessions[sid].folder=id;  // back to the original folder = no override
   cleanupSession(sid);
   if(await saveMeta())refreshAll();
 }
 function allFolderIds(){
   const s=new Set();
-  MANIFEST.forEach(m=>s.add(m.project));         // dossiers-projets d'origine
+  MANIFEST.forEach(m=>s.add(m.project));         // original project folders
   Object.keys(META.folders).forEach(id=>s.add(id));
-  return [...s].filter(id=>!(META.folders[id]&&META.folders[id].deleted));  // masque les projets vidés supprimés
+  return [...s].filter(id=>!(META.folders[id]&&META.folders[id].deleted));  // hide emptied project folders that were removed
 }
 function buildEdition(){
   const body=document.getElementById("ed-body"); body.innerHTML="";
   if(!rootDir){
-    body.innerHTML='<div class="ed-empty">Pour éditer, connecte le dossier <b>export</b> via la pastille en haut à droite.<br>Les modifications sont enregistrées dans <code>data/metadata.json</code>.</div>';
+    body.innerHTML='<div class="ed-empty">To organize your sessions, connect the <b>export</b> folder with the pill in the top right.<br>Changes are stored in <code>data/metadata.json</code>.</div>';
     return;
   }
   const groups=projectGroups();
   const ids=allFolderIds().sort((a,b)=>{
     const ca=a.startsWith("f_"), cb=b.startsWith("f_");
-    if(ca!==cb)return ca?-1:1;                 // dossiers custom en premier
-    if(ca)return a<b?1:-1;                      // custom : id ~ timestamp, plus récent d'abord
-    return folderName(a).localeCompare(folderName(b));  // projets : alphabétique
+    if(ca!==cb)return ca?-1:1;                 // custom folders first
+    if(ca)return a<b?1:-1;                      // custom folders: id ~ timestamp, newest first
+    return folderName(a).localeCompare(folderName(b));  // project folders: alphabetical
   });
   ids.forEach(id=>{
     const sess=(groups[id]||[]).slice().sort((a,b)=>b.mtime-a.mtime);
@@ -1426,7 +1429,7 @@ function buildEdition(){
     const cnt=document.createElement("span"); cnt.className="ed-fcount"; cnt.textContent=sess.length+" sess"; head.appendChild(cnt);
     if(sess.length===0){                          // suppression permise seulement si le dossier est vide
       const del=document.createElement("button"); del.className="ed-del"; del.textContent="✕";
-      del.title=custom?"Supprimer le dossier":"Retirer ce dossier vide de la liste";
+      del.title=custom?"Delete this folder":"Remove this empty folder from the list";
       del.onclick=async()=>{
         if(custom)delete META.folders[id];
         else META.folders[id]=Object.assign(META.folders[id]||{},{deleted:true});
@@ -1442,23 +1445,23 @@ function buildEdition(){
       row.ondragstart=e=>{e.dataTransfer.setData("text/sid",m.sid);e.dataTransfer.effectAllowed="move";row.classList.add("dragging");};
       row.ondragend=()=>row.classList.remove("dragging");
       const mv=document.createElement("select"); mv.className="ed-move";
-      const ph=document.createElement("option"); ph.value=""; ph.textContent="⤳ Déplacer…"; ph.disabled=true; ph.selected=true; mv.appendChild(ph);
+      const ph=document.createElement("option"); ph.value=""; ph.textContent="⤳ Move to…"; ph.disabled=true; ph.selected=true; mv.appendChild(ph);
       allFolderIds().filter(fid=>fid!==id).sort((a,b)=>folderName(a).localeCompare(folderName(b))).forEach(fid=>{
         const op=document.createElement("option"); op.value=fid; op.textContent=folderName(fid); mv.appendChild(op);
       });
       mv.onmousedown=e=>e.stopPropagation();
       mv.onchange=()=>{ if(mv.value)moveSession(m.sid,mv.value); };
       row.appendChild(mv);
-      const ren=document.createElement("button"); ren.className="ed-ren"; ren.textContent="✎"; ren.title="Renommer la session";
+      const ren=document.createElement("button"); ren.className="ed-ren"; ren.textContent="✎"; ren.title="Rename session";
       ren.onmousedown=e=>e.stopPropagation();
-      ren.onclick=async()=>{const v=prompt("Nouveau titre :",effTitle(m)); if(v===null)return; const t=v.trim();
+      ren.onclick=async()=>{const v=prompt("New title:",effTitle(m)); if(v===null)return; const t=v.trim();
         META.sessions[m.sid]=META.sessions[m.sid]||{};
         if(t&&t!==m.title)META.sessions[m.sid].title=t; else delete META.sessions[m.sid].title;
         cleanupSession(m.sid); if(await saveMeta())refreshAll();};
       row.appendChild(ren);
       listEl.appendChild(row);
     });
-    if(!sess.length){const e=document.createElement("div"); e.className="ed-drop-hint"; e.textContent="Dépose des sessions ici"; listEl.appendChild(e);}
+    if(!sess.length){const e=document.createElement("div"); e.className="ed-drop-hint"; e.textContent="Drop sessions here"; listEl.appendChild(e);}
     card.appendChild(listEl);
     card.ondragover=e=>{e.preventDefault();card.classList.add("drop");};
     card.ondragleave=()=>card.classList.remove("drop");
@@ -1469,7 +1472,7 @@ function buildEdition(){
 }
 document.getElementById("ed-newfolder").onclick=async()=>{
   const id="f_"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-  META.folders[id]={name:"Nouveau dossier"};
+  META.folders[id]={name:"New folder"};
   if(await saveMeta()){
     buildEdition();
     const card=document.querySelector('.ed-folder[data-folder="'+id+'"]');
@@ -1511,14 +1514,14 @@ function buildSidebar(filter){
 
 /* ───── Chargement paresseux ───── */
 window.__loadSession=function(sid,payload){cache[sid]=payload; if(pendingSid===sid)mount(sid);};
-function copyText(t){                            // navigator.clipboard exige un secure context : absent en file://
+function copyText(t){                            // navigator.clipboard requires a secure context: missing on file://
   if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(t);
   const ta=document.createElement("textarea"); ta.value=t;
   ta.style.cssText="position:fixed;opacity:0"; document.body.appendChild(ta); ta.select();
   try{document.execCommand("copy");}finally{ta.remove();}
   return Promise.resolve();
 }
-function buildIdCard(sid){                       // identité de la session : de quoi la relancer dans Claude Code
+function buildIdCard(sid){                       // session identity: everything needed to relaunch it in Claude Code
   const m=metaOf(sid); if(!m)return;
   const sub=viewer.querySelector(".sub"); if(!sub)return;
   const btn=document.createElement("button"); btn.className="idbtn"; btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M3.2 4.2 V9.4 H8.4" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Resume this session</span>';
@@ -1531,13 +1534,13 @@ function buildIdCard(sid){                       // identité de la session : de
     '<div class="idrow"><span>Directory</span><b class="mono">'+esc(m.cwd)+'</b></div>'+
     '<div class="idrow"><span>ID</span><b class="mono">'+esc(sid)+'</b></div>';
   const cp=document.createElement("button"); cp.className="idcopy"; cp.textContent="Copy resume command";
-  cp.onclick=()=>{copyText(cmd); cp.textContent="✓ Copié"; setTimeout(()=>cp.textContent="Copy resume command",2000);};
+  cp.onclick=()=>{copyText(cmd); cp.textContent="✓ Copied"; setTimeout(()=>cp.textContent="Copy resume command",2000);};
   card.appendChild(cp);
   btn.onclick=()=>{card.style.display=card.style.display==="none"?"block":"none";};
   sub.appendChild(btn);
   sub.parentNode.insertBefore(card,sub.nextSibling);
 }
-function initManualCopy(){                       // chaque bloc du manuel reçoit le bouton de copie du panneau d'identité
+function initManualCopy(){                       // every manual block gets the same copy button as the identity panel
   document.querySelectorAll("#view-manual .bash").forEach(b=>{
     const cmd=[...b.querySelectorAll(".term-cmd")].map(l=>l.textContent.replace(/^\$\s*/,"")).join("\n");
     const row=document.createElement("div"); row.className="cmdrow";
@@ -1551,9 +1554,9 @@ function openSession(sid){
   pendingSid=sid;
   emptyread.style.display="none";
   if(cache[sid]){mount(sid);return;}
-  viewer.innerHTML='<div class="gridrow"><div class="col-read" style="grid-column:2;color:var(--muted);padding:40px 0">Chargement…</div></div>';
+  viewer.innerHTML='<div class="gridrow"><div class="col-read" style="grid-column:2;color:var(--muted);padding:40px 0">Loading…</div></div>';
   const s=document.createElement("script"); s.src="sessions/"+sid+".js";
-  s.onerror=()=>{viewer.innerHTML='<div class="gridrow"><div class="col-read" style="grid-column:2;color:var(--accent-d);padding:40px 0">Erreur de chargement de la session.</div></div>';};
+  s.onerror=()=>{viewer.innerHTML='<div class="gridrow"><div class="col-read" style="grid-column:2;color:var(--accent-d);padding:40px 0">Could not load this session.</div></div>';};
   document.body.appendChild(s);
 }
 
@@ -1563,7 +1566,7 @@ function mount(sid){
   emptyread.style.display="none";
   viewer.innerHTML=p.html;
   buildIdCard(sid);
-  // La sidebar suit la session ouverte : re-scope si on arrive d'un autre dossier (ex. résultat de recherche).
+  // The sidebar follows the open session: re-scope when arriving from another folder (e.g. a search result).
   const mo=metaOf(sid), proj=mo?effFolder(mo):null;
   if(proj && proj!==curProject){curProject=proj;buildSidebar("");}
   document.querySelectorAll(".sess").forEach(e=>e.classList.toggle("active",e.dataset.sid===sid));
@@ -1618,8 +1621,8 @@ function recolorAnn(id,color){
 
 let pending=null;
 const bar=document.getElementById("seltools");
-bar.innerHTML=COLORS.map(c=>'<span class="sw" data-color="'+c+'" style="background:'+SWVAR[c]+'" title="Surligner"></span>').join("")+
-  '<span class="sep"></span><button class="cmt" data-act="cmt">✎ Commenter</button>';
+bar.innerHTML=COLORS.map(c=>'<span class="sw" data-color="'+c+'" style="background:'+SWVAR[c]+'" title="Highlight"></span>').join("")+
+  '<span class="sep"></span><button class="cmt" data-act="cmt">✎ Comment</button>';
 function hideBar(){bar.style.display="none";pending=null;}
 function showBar(rect){bar.style.display="flex";bar.style.left=(rect.left+rect.width/2)+"px";bar.style.top=rect.top+"px";}
 function annoOf(range){let n=range.commonAncestorContainer;if(n.nodeType===3)n=n.parentNode;return n.closest?n.closest(".anno"):null;}
@@ -1686,7 +1689,7 @@ document.addEventListener("click",e=>{
   if(!e.target.closest("#notepop")&&!e.target.closest("#seltools"))closeNote();
 });
 
-/* ───── Gouttière + récap ───── */
+/* ───── Gutter + recap ───── */
 function refresh(){reflow();buildRecap();}
 function reflow(){
   viewer.querySelectorAll(".exchange").forEach(ex=>{
@@ -1712,7 +1715,7 @@ function buildRecap(){
   document.getElementById("recap-count").textContent=noted.length;
   document.getElementById("cbadge").textContent=noted.length;
   const list=document.getElementById("recap-list");
-  if(!noted.length){list.innerHTML='<div class="empty">Aucun commentaire dans cette session.<br>Sélectionne un passage puis « Commenter ».</div>';return;}
+  if(!noted.length){list.innerHTML='<div class="empty">No comments in this session.<br>Select a passage, then choose “Comment”.</div>';return;}
   list.innerHTML="";
   noted.forEach(a=>{
     const sec=(a.bid.split("-")[0]||"s").replace("s","");
@@ -1777,7 +1780,7 @@ function buildResults(q){
     if(c>0||inMeta)hits.push({m,c,text});
   });
   hits.sort((a,b)=>b.c-a.c||b.m.mtime-a.m.mtime);
-  if(!hits.length){list.innerHTML='<div class="sr-none">Aucun résultat pour<br>« '+esc(q)+' »</div>';return;}
+  if(!hits.length){list.innerHTML='<div class="sr-none">No results for<br>“'+esc(q)+' »</div>';return;}
   const tot=hits.reduce((t,h)=>t+h.c,0);
   const head=document.createElement("div"); head.className="sr-head";
   head.textContent=hits.length+' session'+(hits.length>1?'s':'')+' · '+tot+' occurrence'+(tot>1?'s':'');
@@ -1846,7 +1849,7 @@ document.getElementById("enterBtn").onclick=()=>setView("dash");
 /* ───── Init ───── */
 document.getElementById("search").addEventListener("input",e=>onSearch(e.target.value));
 let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(reflow,150);});
-/* Sidebar réglable : largeur persistée en localStorage (préférence UI pure, pas sur disque) */
+/* Resizable sidebar: width persisted in localStorage (pure UI preference, never on disk) */
 (function(){
   const layout=document.querySelector(".layout"), rz=document.getElementById("side-resizer");
   const KEY="memorium-side-w", MIN=220, MAX=520;
@@ -1859,9 +1862,9 @@ let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(ref
     localStorage.setItem(KEY,parseInt(layout.style.getPropertyValue("--side-w"))||300);});
 })();
 
-/* ═════════ Hero welcome : ruban-mémoire WebGL (zéro dépendance) ═════════
+/* ═════════ Welcome hero: WebGL memory ribbon (zero dependency) ═════════
    Gating perf : la boucle rAF ne tourne que quand la vue welcome est visible,
-   pilotée par setView via window.__heroSetActive. */
+   driven by setView through window.__heroSetActive. */
 (function(){
 const canvas=document.getElementById("gl");
 const titleEl=document.getElementById("wTitle");
@@ -1873,7 +1876,7 @@ if(!gl){canvas.style.display="none";document.getElementById("glfail").style.disp
   titleEl.textContent=WORD;titleEl.classList.add("typed");
   window.__heroSetActive=function(){};return;}
 
-/* ── mini algèbre mat4 (column-major, style gl-matrix) ── */
+/* ── tiny mat4 algebra (column-major, gl-matrix style) ── */
 function perspective(fovy,aspect,near,far){
   const f=1/Math.tan(fovy/2), nf=1/(near-far);
   return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
@@ -1965,12 +1968,12 @@ const ploc={uMVP:gl.getUniformLocation(ptProg,"uMVP")};
 const pgProg=makeProg(VS_PG,FS_PG,["aPos","aA"]);
 const pgloc={uMVP:gl.getUniformLocation(pgProg,"uMVP")};
 
-/* ── géométrie du ruban (régénérée par frame pour la rotation) ── */
+/* ── ribbon geometry (rebuilt each frame for the rotation) ── */
 const NSEG=300, HW=0.60, SPAN=26.0, TWIST=1.4;
 const bPos=gl.createBuffer(), bNor=gl.createBuffer(), bS=gl.createBuffer(), bV=gl.createBuffer();
 const posA=new Float32Array((NSEG+1)*6), norA=new Float32Array((NSEG+1)*6),
       sA=new Float32Array((NSEG+1)*2), vA=new Float32Array((NSEG+1)*2);
-// positions + tailles + face (±1) : nœuds sur les DEUX faces du ruban, espacés pour les étiquettes
+// positions + sizes + face (±1): nodes on BOTH sides of the ribbon, spaced out for the labels
 const NODES=[0.06,0.21,0.37,0.55,0.72,0.88];
 const NSIZE=[0.95, 1.15, 0.8, 1.2, 0.85, 1.05];
 const NFACE=[1,  -1,   1,   -1,  -1,   1];
@@ -1983,14 +1986,14 @@ const pgA=new Float32Array(PSEG*6*4);                      // anneau ping : (xyz
 const tkA=new Float32Array(NODES.length*VPM*4);            // (xyz + brightness) par sommet
 
 function curve(s,out){
-  // forme FIGÉE (statique) : les nœuds restent persistants, aucun churn à l'ondulation
+  // FROZEN shape (static): nodes stay put, the ripple causes no churn
   const env=Math.sin(Math.PI*Math.min(1,Math.max(0,s)));
   out[0]=(s-0.5)*SPAN;
   out[1]=env*(1.02*Math.sin(s*4.2+0.6) + 0.30*Math.sin(s*9.0+0.9));
   out[2]=env*(0.40*Math.sin(s*3.0+1.1));
 }
 const _a=[0,0,0],_b=[0,0,0];
-// repère local (point de l'épine + largeur W + normale N) — épine figée, W/N tournent avec le temps
+// local frame (spine point + width W + normal N) — spine is frozen, W/N rotate over time
 const _fp=[0,0,0],_fW=[0,0,0],_fN=[0,0,0];
 function computeFrame(s,t){
   curve(s,_fp);
@@ -2059,7 +2062,7 @@ function buildTicks(progress,activeNode,intensity,t){
   gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,1,gl.FLOAT,false,16,12);
 }
 function pushPg(k,x,y,z,a){ pgA[k]=x;pgA[k+1]=y;pgA[k+2]=z;pgA[k+3]=a;return k+4; }
-// anneau ping qui jaillit du nœud trouvé (pingT 0→1 = jeune→dissipé)
+// ping ring bursting out of the matched node (pingT 0→1 = young→faded)
 function buildPing(active,pingT,intensity,t){
   computeFrame(NODES[active],t);
   const f=NFACE[active], len=STEM_LEN;
@@ -2091,7 +2094,7 @@ function resize(){
 }
 
 const CAM=[0,0.10,9.8];
-const DRAW_DUR=2.4;                                   // tracé G→D (assez lent pour voir les nœuds un par un)
+const DRAW_DUR=2.4;                                   // left-to-right draw (slow enough to watch the nodes appear one by one)
 function easeOutCubic(x){return 1-Math.pow(1-x,3);}
 
 function render(elapsed,sig){
@@ -2102,9 +2105,9 @@ function render(elapsed,sig){
   gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   const view=lookAt(CAM,[0,0,0],[0,1,0]);
   const mvp=mul(projM,view);
-  curMVP=mvp;                                         // partagé avec la projection des étiquettes
+  curMVP=mvp;                                         // shared with the label projection
 
-  // passe 1 : ruban, révélé jusqu'au front
+  // pass 1: ribbon, revealed up to the draw front
   gl.useProgram(prog);
   gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
   buildRibbon(elapsed);
@@ -2114,14 +2117,14 @@ function render(elapsed,sig){
   const pairs=Math.max(1,Math.floor(NSEG*progress));
   gl.drawArrays(gl.TRIANGLE_STRIP,0,(pairs+1)*2);
 
-  // passe 2 : nœuds de commit sur les 2 faces (germent un par un, orbitent, persistent)
+  // pass 2: commit nodes on both faces (sprout one by one, orbit, persist)
   gl.useProgram(ptProg);
   gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
   buildTicks(progress,active,inten,elapsed);
   gl.uniformMatrix4fv(ploc.uMVP,false,mvp);
   gl.drawArrays(gl.TRIANGLES,0,NODES.length*VPM);
 
-  // passe 3 : ping radar sur le nœud trouvé (transparent, n'écrit pas la profondeur)
+  // pass 3: radar ping on the matched node (transparent, does not write depth)
   const pingT = sig?sig.pingT:-1;
   if(active>=0 && pingT>=0 && inten>0){
     gl.useProgram(pgProg);
@@ -2134,7 +2137,7 @@ function render(elapsed,sig){
   }
 }
 
-/* signature : requêtes tapées, chaque requête illumine son nœud */
+/* signature: typed queries, each one lighting up its own node */
 const QUERIES=[{q:"auth bug",node:3},{q:"docker port",node:1},{q:"playwright test",node:5}];
 const SIG_START=DRAW_DUR+1.6, CYCLE=4.0;
 function computeSig(elapsed){
@@ -2146,15 +2149,15 @@ function computeSig(elapsed){
     if(ct>1.25){ activeNode=Q.node;
       intensity=Math.min(1,(ct-1.25)/0.25);
       if(ct>2.7) intensity*=Math.max(0,1-(ct-2.7)/0.4);
-      pingT=((ct-1.25)%0.9)/0.9; } }                                     // pings radar répétés
+      pingT=((ct-1.25)%0.9)/0.9; } }                                     // repeating radar pings
   else { const er=Math.max(0,1-(ct-3.1)/0.5); text=Q.q.slice(0,Math.ceil(Q.q.length*er)); }
   return {visible:true,text,activeNode,intensity,pingT};
 }
 const sbar=document.getElementById("sbar"), sq=document.getElementById("sq");
 function updateSearchBar(sig){ sbar.style.opacity=sig.visible?"1":"0"; sq.textContent=sig.text; }
 
-/* étiquettes de commit : hash tamponné à la germination, message tapé lettre à lettre.
-   Les requêtes de la barre matchent ces messages → la scène raconte une seule histoire. */
+/* commit labels: hash stamped when the node sprouts, message typed letter by letter.
+   The search bar queries match these messages → the scene tells a single story. */
 const LABELS=[
   {h:"3e1f0aa",m:"feat: session export"},
   {h:"9b01e44",m:"fix: docker port map"},
@@ -2182,7 +2185,7 @@ function project(x,y,z,out){
 function updateLabels(elapsed,sig){
   if(!curMVP)return;
   const progress=Math.min(1,elapsed/DRAW_DUR);
-  const pxu=canvas.clientWidth/SPAN;                 // ≈ pixels par unité monde
+  const pxu=canvas.clientWidth/SPAN;                 // ≈ pixels per world unit
   for(let i=0;i<LABELS.length;i++){
     const L=labelEls[i], s=NODES[i];
     const reveal=Math.min(1,Math.max(0,(progress-s)/0.045));
@@ -2193,13 +2196,13 @@ function updateLabels(elapsed,sig){
     project(_fp[0],_fp[1],_fp[2],_pb); project(tx,ty,tz,_pt);
     let dx=_pt[0]-_pb[0], dy=_pt[1]-_pb[1];
     const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl;
-    const off=14+NODE_R*NSIZE[i]*pxu;                // posé au-delà de la perle, dans l'axe de la tige
+    const off=14+NODE_R*NSIZE[i]*pxu;                // placed past the bead, along the stem axis
     L.root.style.left=Math.round(_pt[0]+dx*off)+"px";
     L.root.style.top =Math.round(_pt[1]+dy*off)+"px";
     L.h.textContent=LABELS[i].h;
     const chars=RM?99:Math.max(0,Math.floor((elapsed-s*DRAW_DUR)*TYPE_CPS));
     L.m.textContent=LABELS[i].m.slice(0,chars);
-    // face avant = lisible, face arrière = discret (suit la rotation de la bande)
+    // front face = readable, back face = muted (follows the ribbon rotation)
     const facing=Math.max(0,Math.min(1,_fN[2]*f*1.6+0.55));
     const hit=sig&&sig.activeNode===i&&sig.intensity>0.3;
     L.root.style.opacity=((hit?1:0.30+0.55*facing)*reveal).toFixed(3);
@@ -2207,7 +2210,7 @@ function updateLabels(elapsed,sig){
   }
 }
 
-/* titre tapé lettre par lettre, après le tracé de la bande */
+/* title typed letter by letter, once the ribbon is drawn */
 function typeTitle(){
   let i=0;
   (function step(){
@@ -2217,7 +2220,7 @@ function typeTitle(){
   })();
 }
 
-/* ── cycle de vie : démarrage/arrêt pilotés par la visibilité de la vue ── */
+/* ── lifecycle: start/stop driven by the view visibility ── */
 let running=false, rafId=0, t0=0, typeTimer=null;
 function loop(now){
   if(!running)return;
@@ -2230,7 +2233,7 @@ function start(){
   clearTimeout(typeTimer); typeTimer=setTimeout(typeTitle,(DRAW_DUR+0.25)*1000);
   t0=performance.now(); rafId=requestAnimationFrame(loop);
 }
-function staticFrame(){                              // reduced-motion : scène finale figée
+function staticFrame(){                              // reduced-motion: final frame, frozen
   const sig={visible:true,text:"auth bug",activeNode:3,intensity:1,pingT:-1};
   render(DRAW_DUR,sig); updateSearchBar(sig); updateLabels(DRAW_DUR,sig);
   titleEl.textContent=WORD; titleEl.classList.add("typed");
@@ -2265,7 +2268,7 @@ def slugify_name(s):
 
 
 def write_session_file(out_dir, sid, payload):
-    """Écrit sessions/<sid>.js : enregistre le HTML rendu via __loadSession (chargé au clic)."""
+    """Write sessions/<sid>.js: stores the rendered HTML behind __loadSession (fetched on click)."""
     js = "window.__loadSession(" + json.dumps(sid) + "," + json.dumps(payload, ensure_ascii=False) + ");\n"
     with open(os.path.join(out_dir, "sessions", sid + ".js"), "w", encoding="utf-8") as f:
         f.write(js)
@@ -2281,13 +2284,13 @@ def plain_text(html_str):
 
 
 def write_search_index(out_dir, index):
-    """Écrit searchindex.js : window.__SEARCH = {sid: "texte brut minuscule"}."""
+    """Write searchindex.js: window.__SEARCH = {sid: "lowercased plain text"}."""
     js = "window.__SEARCH=" + json.dumps(index, ensure_ascii=False) + ";\n"
     with open(os.path.join(out_dir, "searchindex.js"), "w", encoding="utf-8") as f:
         f.write(js)
 
 
-# Favicon : marque ruban ondulé en SVG data URI (vecteur, net de 16 à 512 px)
+# Favicon: the rippling ribbon mark as an SVG data URI (vector, crisp from 16 to 512 px)
 FAVICON_URI = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23F6EDDC'/%3E%3Cpath d='M4 16 C9 9, 14 23, 20 16 C23 12.5, 25 13.5, 27 15' stroke='%238E9C63' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='8' r='3.2' fill='%23A4AC86' stroke='%236E7A4B' stroke-width='1.6'/%3E%3Ccircle cx='21' cy='24' r='3.2' fill='%23A4AC86' stroke='%236E7A4B' stroke-width='1.6'/%3E%3C/svg%3E"
 
 
@@ -2301,14 +2304,14 @@ def build_index(out_dir, manifest):
 
 
 def serve(out_dir, port=8137):
-    # Sert export/ sur localhost : la File System Access API exige un secure context
-    # (indisponible en file://). Serveur de fichiers statiques pur, zéro logique métier.
+    # Serve export/ on localhost: the File System Access API requires a secure context
+    # (unavailable on file://). Plain static file server, zero business logic.
     import http.server
     os.chdir(out_dir)
     httpd = http.server.ThreadingHTTPServer(
         ("127.0.0.1", port), http.server.SimpleHTTPRequestHandler)
     url = f"http://localhost:{port}/index.html"
-    print(f"\n  ▶ Memorium servi sur {url}   (Ctrl+C pour arrêter)")
+    print(f"\n  ▶ Memorium served at {url}   (Ctrl+C to stop)")
     try:
         webbrowser.open(url)
     except Exception:
@@ -2316,13 +2319,13 @@ def serve(out_dir, port=8137):
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n  ✓ Serveur arrêté.")
+        print("\n  ✓ Server stopped.")
 
 
-# ─────────────────────────── Archivage des sources ───────────────────────────
+# ─────────────────────────── Source archiving ───────────────────────────
 
 def archive_sessions(dest_root=None):
-    """Copie gzip incrémentale des .jsonl vers l'archive. Le HTML se lit, seul le brut se relance."""
+    """Incremental gzip copy of the JSONL files. HTML can be read; only the raw file can be resumed."""
     dest_root = dest_root or ARCHIVE_DIR
     os.makedirs(dest_root, exist_ok=True)
     index_path = os.path.join(dest_root, "index.json")
@@ -2333,7 +2336,7 @@ def archive_sessions(dest_root=None):
             with open(index_path, encoding="utf-8") as f:
                 index = json.load(f)
         except Exception:
-            index = {}          # index illisible : on réarchive tout plutôt que d'abandonner
+            index = {}          # unreadable index: re-archive everything rather than give up
 
     paths = glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl"))
     paths = [p for p in paths if "observer-sessions" not in os.path.dirname(p)]
@@ -2349,14 +2352,14 @@ def archive_sessions(dest_root=None):
             failed += 1
             continue
         prev = index.get(sid)
-        # Un JSONL ne fait que grandir : taille + mtime identiques = rien de nouveau à écrire.
+        # A JSONL file only grows: same size + same mtime means nothing new to write.
         if prev and prev.get("size") == st.st_size and prev.get("mtime") == int(st.st_mtime):
             unchanged += 1
             continue
         out_dir = os.path.join(dest_root, proj_dir)
         os.makedirs(out_dir, exist_ok=True)
         out = os.path.join(out_dir, sid + ".jsonl.gz")
-        tmp = out + ".part"     # écriture atomique : une interruption ne laisse pas d'archive tronquée
+        tmp = out + ".part"     # atomic write: an interruption never leaves a truncated archive
         try:
             with open(path, "rb") as src, gzip.open(tmp, "wb") as dst:
                 shutil.copyfileobj(src, dst)
@@ -2388,17 +2391,17 @@ def archive_sessions(dest_root=None):
     total = sum(os.path.getsize(os.path.join(r, n))
                 for r, _, ns in os.walk(dest_root) for n in ns)
     print(f"\n  ✓ Archive : {dest_root}")
-    print(f"  {added} nouvelles, {refreshed} mises à jour, {unchanged} inchangées"
-          + (f", {failed} en échec" if failed else ""))
+    print(f"  {added} new, {refreshed} updated, {unchanged} unchanged"
+          + (f", {failed} failed" if failed else ""))
     if raw_bytes:
-        print(f"  {raw_bytes/1048576:.1f} Mo lus → {gz_bytes/1048576:.1f} Mo écrits "
+        print(f"  {raw_bytes/1048576:.1f} MB read → {gz_bytes/1048576:.1f} MB written "
               f"({raw_bytes/gz_bytes:.1f}x)")
-    print(f"  {len(index)} sessions archivées, {total/1048576:.1f} Mo au total\n")
+    print(f"  {len(index)} sessions archived, {total/1048576:.1f} MB in total\n")
     return index
 
 
 def load_archive_index(dest_root=None):
-    """Index de l'archive : {sid: {project, size, mtime, archived}}."""
+    """Archive index: {sid: {project, size, mtime, archived}}."""
     path = os.path.join(dest_root or ARCHIVE_DIR, "index.json")
     if not os.path.isfile(path):
         return {}
@@ -2410,7 +2413,7 @@ def load_archive_index(dest_root=None):
 
 
 def session_cwd(path):
-    """Dossier de travail d'une session : lu dans le transcript, jamais déduit du nom de dossier."""
+    """A session working directory: read from the transcript, never guessed from the folder name."""
     try:
         with open(path, encoding="utf-8") as f:
             for line in f:
@@ -2428,18 +2431,18 @@ def session_cwd(path):
 
 
 def restore_session(prefix, dest_root=None, force=False):
-    """Décompresse une session archivée vers ~/.claude/projects pour rendre `claude --resume` possible."""
+    """Decompress an archived session into ~/.claude/projects so `claude --resume` works again."""
     index = load_archive_index(dest_root)
     if not index:
-        print("  Aucune archive trouvée. Lance d'abord : memorium archive")
+        print("  No archive found. Run this first: memorium archive")
         return 1
 
     hits = [sid for sid in index if sid.startswith(prefix)]
     if not hits:
-        print("  Aucune session archivée ne commence par %r (%d en archive)." % (prefix, len(index)))
+        print("  No archived session starts with %r (%d archived)." % (prefix, len(index)))
         return 1
     if len(hits) > 1:
-        print("  %d sessions commencent par %r — précise davantage :" % (len(hits), prefix))
+        print("  %d sessions start with %r — be more specific:" % (len(hits), prefix))
         for sid in sorted(hits)[:10]:
             print("    %s  (%s)" % (sid, index[sid]["project"]))
         return 1
@@ -2448,31 +2451,31 @@ def restore_session(prefix, dest_root=None, force=False):
     meta = index[sid]
     src = os.path.join(dest_root or ARCHIVE_DIR, meta["project"], sid + ".jsonl.gz")
     if not os.path.isfile(src):
-        print("  Archive manquante sur le disque : " + src)
+        print("  Archive missing on disk: " + src)
         return 1
 
     out_dir = os.path.join(PROJECTS_DIR, meta["project"])
     dest = os.path.join(out_dir, sid + ".jsonl")
-    # Une session vivante peut être plus récente que l'archive : ne jamais l'écraser en silence.
+    # A live session may be newer than the archive: never overwrite it silently.
     if os.path.exists(dest) and not force:
         local = os.path.getsize(dest)
         print("")
         if local == meta["size"]:
-            # Même taille = la session locale EST l'archive : parler d'écrasement n'aurait aucun sens.
-            print("  Cette session est toujours en place, identique à l'archive.")
+            # Same size means the local session IS the archive: talking about overwriting makes no sense.
+            print("  This session is still in place, identical to the archive.")
             print("  " + dest)
-            print("  Rien à restaurer — tu peux la reprendre directement :")
+            print("  Nothing to restore — you can resume it right away:")
             cwd = session_cwd(dest)
             if cwd:
                 print('    cd "%s"' % cwd)
             print("    claude --resume " + sid)
             print("")
             return 0
-        print("  Une session porte déjà cet identifiant, et elle diffère de l'archive :")
+        print("  A session with this id already exists, and it differs from the archive:")
         print("  " + dest)
-        print("  locale : %d octets | archive : %d octets" % (local, meta["size"]))
-        print("  La version locale est probablement plus récente. Rien n'a été touché.")
-        print("  Pour la remplacer par l'archive : memorium restore <id> --force")
+        print("  local: %d bytes | archive: %d bytes" % (local, meta["size"]))
+        print("  The local copy is probably newer. Nothing was touched.")
+        print("  To replace it with the archive: memorium restore <id> --force")
         print("")
         return 1
 
@@ -2488,15 +2491,15 @@ def restore_session(prefix, dest_root=None, force=False):
                 os.remove(tmp)
             except OSError:
                 pass
-        print("  Restauration impossible : %s" % e)
+        print("  Restore failed: %s" % e)
         return 1
 
     cwd = session_cwd(dest)
     print("")
-    print("  ✓ Restaurée : " + dest)
-    print("  %d octets, archivée le %s" % (os.path.getsize(dest), meta.get("archived", "?")))
+    print("  ✓ Restored: " + dest)
+    print("  %d bytes, archived on %s" % (os.path.getsize(dest), meta.get("archived", "?")))
     print("")
-    print("  Pour reprendre la conversation :")
+    print("  To resume the conversation:")
     if cwd:
         print('    cd "%s"' % cwd)
     print("    claude --resume " + sid)
@@ -2504,19 +2507,19 @@ def restore_session(prefix, dest_root=None, force=False):
     return 0
 
 
-# ─────────────────────────── Installation (settings Claude Code) ───────────────────────────
+# ─────────────────────────── Setup (Claude Code settings) ───────────────────────────
 
 SETTINGS_PATH = os.environ.get("MEMORIUM_SETTINGS") or os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
 RETENTION_DAYS = 3650
 
 
 def archive_command():
-    """Commande lancée par le hook : interpréteur et script en absolu, sans dépendre du PATH."""
+    """Command the hook will run: interpreter and script as absolute paths, no PATH lookup."""
     return '"%s" "%s" archive' % (sys.executable, os.path.abspath(__file__))
 
 
 def init_settings(settings_path=None, assume_yes=False):
-    """Relève la rétention et installe le hook SessionEnd, après avoir montré ce qui sera écrit."""
+    """Raise retention and install the SessionEnd hook, after showing what will be written."""
     path = settings_path or SETTINGS_PATH
     data = {}
     if os.path.isfile(path):
@@ -2524,12 +2527,12 @@ def init_settings(settings_path=None, assume_yes=False):
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
-            print("  %s est illisible (JSON invalide). Rien n'a été touché." % path)
+            print("  %s is unreadable (invalid JSON). Nothing was touched." % path)
             return 1
 
     changes = []
     current = data.get("cleanupPeriodDays")
-    # On relève, jamais on abaisse : une rétention plus longue que la nôtre est un choix de l'utilisateur.
+    # We raise, never lower: a retention window longer than ours is the user's own choice.
     raise_retention = not isinstance(current, int) or current < RETENTION_DAYS
     if raise_retention:
         changes.append(("cleanupPeriodDays", repr(current), str(RETENTION_DAYS)))
@@ -2540,35 +2543,35 @@ def init_settings(settings_path=None, assume_yes=False):
     already = any("memorium" in h.get("command", "").lower() or "export.py" in h.get("command", "")
                   for group in session_end for h in (group.get("hooks") or []))
     if not already:
-        changes.append(("hooks.SessionEnd", "(aucun hook Memorium)", cmd))
+        changes.append(("hooks.SessionEnd", "(no Memorium hook)", cmd))
 
     if not changes:
         print("")
-        print("  Rien à faire : la rétention est déjà suffisante et le hook est installé.")
+        print("  Nothing to do: retention is already long enough and the hook is installed.")
         print("")
         return 0
 
     print("")
-    print("  Memorium va modifier ta configuration Claude Code :")
+    print("  Memorium is about to change your Claude Code settings:")
     print("    " + path)
     print("")
     for key, before, after in changes:
         print("    " + key)
-        print("      avant : " + before)
-        print("      après : " + after)
+        print("      before: " + before)
+        print("      after:  " + after)
     print("")
-    print("  Effet : tes sessions ne seront plus supprimées au bout de 30 jours,")
-    print("  et chaque fin de session déclenchera une sauvegarde automatique.")
-    print("  Une copie de sauvegarde du fichier actuel sera écrite à côté (.bak).")
+    print("  Effect: your sessions will no longer be deleted after 30 days,")
+    print("  and every session will be archived when it ends.")
+    print("  A backup of the current file will be written next to it (.bak).")
     print("")
 
     if not assume_yes:
         try:
-            answer = input("  Appliquer ces changements ? [o/N] ").strip().lower()
+            answer = input("  Apply these changes? [y/N] ").strip().lower()
         except EOFError:
             answer = ""
-        if answer not in ("o", "oui", "y", "yes"):
-            print("  Annulé. Aucun fichier modifié.")
+        if answer not in ("y", "yes"):
+            print("  Cancelled. No file was modified.")
             return 1
 
     backed_up = False
@@ -2577,7 +2580,7 @@ def init_settings(settings_path=None, assume_yes=False):
             shutil.copy2(path, path + ".bak")
             backed_up = True
         except OSError as e:
-            print("  Sauvegarde impossible (%s) — on s'arrête là, ta config reste intacte." % e)
+            print("  Backup failed (%s) — stopping here, your settings are untouched." % e)
             return 1
 
     if raise_retention:
@@ -2594,20 +2597,20 @@ def init_settings(settings_path=None, assume_yes=False):
             json.dump(data, f, indent=2, ensure_ascii=False)
         os.replace(tmp, path)
     except OSError as e:
-        print("  Écriture impossible : %s" % e)
+        print("  Write failed: %s" % e)
         return 1
 
     print("")
-    print("  ✓ Configuration mise à jour (%s)" % path)
+    print("  ✓ Settings updated (%s)" % path)
     if backed_up:
-        print("  ✓ Sauvegarde : %s.bak" % path)
-    print("  Les sessions seront archivées automatiquement à partir de la prochaine.")
+        print("  ✓ Backup: %s.bak" % path)
+    print("  Sessions will be archived automatically from the next one on.")
     print("")
     return 0
 
 
 def main():
-    # Console Windows = cp1252 par défaut : force UTF-8 pour les caractères accentués / symboles.
+    # Windows console defaults to cp1252: force UTF-8 for accents and symbols.
     for stream in (sys.stdout, sys.stderr, sys.stdin):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -2621,23 +2624,23 @@ def main():
     if "restore" in argv:
         rest = [a for a in argv if a not in ("restore", "--force")]
         if not rest:
-            print("  Usage : memorium restore <id ou début d'id> [--force]")
+            print("  Usage: memorium restore <id or id prefix> [--force]")
             sys.exit(1)
         sys.exit(restore_session(rest[0], force="--force" in argv))
     if "init" in argv:
         sys.exit(init_settings(assume_yes="--yes" in argv))
 
-    # Arguments : "serve" (sert sur localhost) et/ou un dossier de sortie
+    # Arguments: "serve" (serve on localhost) and/or an output directory
     serve_mode = "serve" in sys.argv[1:]
     args = [a for a in sys.argv[1:] if a != "serve"]
     out_dir = clean_input(args[0]) if args else os.path.join(os.getcwd(), "export")
     os.makedirs(os.path.join(out_dir, "sessions"), exist_ok=True)
 
     paths = glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl"))
-    # Exclut les sessions automatiques du memory-observer (bruit : 1 prompt, non conversationnel)
+    # Skip the memory-observer automatic sessions (noise: one prompt, not conversational)
     paths = [p for p in paths if "observer-sessions" not in os.path.dirname(p)]
     paths.sort(key=os.path.getmtime, reverse=True)
-    print(f"\n  {len(paths)} sessions trouvées. Parsing…\n")
+    print(f"\n  {len(paths)} sessions found. Parsing…\n")
 
     manifest = []
     search_index = {}
@@ -2667,19 +2670,19 @@ def main():
         })
         ok += 1
         if ok % 25 == 0:
-            print(f"  … {ok} sessions rendues")
+            print(f"  … {ok} sessions rendered")
 
     write_search_index(out_dir, search_index)
     build_index(out_dir, manifest)
     index = os.path.join(out_dir, "index.html")
-    print(f"\n  ✓ {ok} sessions exportées ({skipped} vides/ignorées)")
-    print(f"  ✓ Index : {index}")
+    print(f"\n  ✓ {ok} sessions exported ({skipped} empty or skipped)")
+    print(f"  ✓ Index: {index}")
     if serve_mode:
         serve(out_dir)
     else:
         try:
             webbrowser.open("file:///" + index.replace("\\", "/"))
-            print("  → Ouverture dans le navigateur…")
+            print("  → Opening in your browser…")
         except Exception:
             pass
 
