@@ -655,19 +655,19 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     border-radius:var(--r-pill);padding:2px 9px;font-weight:700;}
 
   /* ───── Editable notebook ───── */
-  .cn-layout{display:flex;height:calc(100vh - var(--nav-h));}
-  .cn-source{flex:0 0 380px;max-width:44%;overflow-y:auto;padding:20px 18px 60px;border-right:1px solid var(--line);background:var(--panel);}
-  .cn-src-hint{font-size:var(--fs-2);color:var(--muted);font-style:italic;line-height:1.5;padding:2px 2px 10px;border-bottom:1px dashed var(--line);margin-bottom:6px;}
-  .cn-editor{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--paper);}
-  .cn-etop{display:flex;align-items:center;gap:12px;padding:16px 26px 12px;border-bottom:1px solid var(--line);}
-  .cn-etop .cn-title{font-size:var(--fs-5);font-weight:800;letter-spacing:-.01em;}
-  .cn-status{margin-left:auto;font-size:var(--fs-2);color:var(--muted);}
-  .cn-status.ok{color:var(--accent2);} .cn-status.err{color:var(--accent-d);}
-  #cn-text{flex:1;width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--ink);
+  .nb-layout{display:flex;height:calc(100vh - var(--nav-h));}
+  .nb-source{flex:0 0 380px;max-width:44%;overflow-y:auto;padding:20px 18px 60px;border-right:1px solid var(--line);background:var(--panel);}
+  .nb-src-hint{font-size:var(--fs-2);color:var(--muted);font-style:italic;line-height:1.5;padding:2px 2px 10px;border-bottom:1px dashed var(--line);margin-bottom:6px;}
+  .nb-editor{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--paper);}
+  .nb-etop{display:flex;align-items:center;gap:12px;padding:16px 26px 12px;border-bottom:1px solid var(--line);}
+  .nb-etop .nb-title{font-size:var(--fs-5);font-weight:800;letter-spacing:-.01em;}
+  .nb-status{margin-left:auto;font-size:var(--fs-2);color:var(--muted);}
+  .nb-status.ok{color:var(--accent2);} .nb-status.err{color:var(--accent-d);}
+  #nb-text{flex:1;width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--ink);
     font-family:var(--mono);font-size:var(--fs-4);line-height:1.7;padding:20px 26px 90px;}
-  #cn-text::placeholder{color:var(--muted);}
+  #nb-text::placeholder{color:var(--muted);}
 
-  /* ───── Edition ───── */
+  /* ───── Organize ───── */
   .ed-wrap{max-width:880px;margin:0 auto;padding:34px 24px 110px;}
   .ed-head h1{font-size:var(--fs-7);margin:0 0 8px;font-weight:800;letter-spacing:-.01em;}
   .ed-head p{color:var(--muted);font-size:var(--fs-3);margin:0 0 8px;max-width:640px;line-height:1.55;}
@@ -691,24 +691,24 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .ed-ren{background:none;border:none;color:var(--muted);cursor:pointer;font-size:var(--fs-3);padding:2px 6px;border-radius:var(--r-1);}
   .ed-ren:hover{color:var(--accent-d);background:var(--panel);}
   .ed-drop-hint{font-size:var(--fs-2);color:var(--muted);font-style:italic;padding:9px;text-align:center;border:1px dashed var(--line);border-radius:var(--r-2);}
-  .cn-empty{color:var(--muted);text-align:center;padding:70px 20px;line-height:1.8;}
-  .cn-proj{margin:30px 0 0;}
-  .cn-proj > h2{font-size:var(--fs-3);letter-spacing:.12em;text-transform:uppercase;color:var(--accent-d);font-weight:700;
+  .nb-empty{color:var(--muted);text-align:center;padding:70px 20px;line-height:1.8;}
+  .nb-proj{margin:30px 0 0;}
+  .nb-proj > h2{font-size:var(--fs-3);letter-spacing:.12em;text-transform:uppercase;color:var(--accent-d);font-weight:700;
     margin:0 0 4px;display:flex;align-items:baseline;gap:10px;}
-  .cn-proj > h2 .c{font-size:var(--fs-1);color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;}
-  .cn-sess{margin:14px 0 0;}
-  .cn-sess > h3{font-size:var(--fs-3);font-weight:700;margin:0 0 7px;color:var(--ink);cursor:pointer;}
-  .cn-sess > h3:hover{color:var(--accent-d);}
-  .cn-item{display:flex;gap:11px;background:var(--white);border:1px solid var(--line);border-radius:var(--r-2);
+  .nb-proj > h2 .c{font-size:var(--fs-1);color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;}
+  .nb-sess{margin:14px 0 0;}
+  .nb-sess > h3{font-size:var(--fs-3);font-weight:700;margin:0 0 7px;color:var(--ink);cursor:pointer;}
+  .nb-sess > h3:hover{color:var(--accent-d);}
+  .nb-item{display:flex;gap:11px;background:var(--white);border:1px solid var(--line);border-radius:var(--r-2);
     padding:10px 13px;margin:0 0 8px;cursor:pointer;transition:.12s;}
-  .cn-item:hover{border-color:var(--accent2);transform:translateX(-2px);box-shadow:0 2px 10px rgba(0,0,0,.05);}
-  .cn-dot{flex:none;width:11px;height:11px;border-radius:var(--r-1);margin-top:5px;}
-  .cn-body{min-width:0;}
-  .cn-quote{font-size:var(--fs-2);color:var(--muted);border-left:2px solid var(--line);padding-left:9px;
+  .nb-item:hover{border-color:var(--accent2);transform:translateX(-2px);box-shadow:0 2px 10px rgba(0,0,0,.05);}
+  .nb-dot{flex:none;width:11px;height:11px;border-radius:var(--r-1);margin-top:5px;}
+  .nb-body{min-width:0;}
+  .nb-quote{font-size:var(--fs-2);color:var(--muted);border-left:2px solid var(--line);padding-left:9px;
     font-style:italic;word-break:break-word;}
-  .cn-note{font-size:var(--fs-3);color:var(--ink);margin-top:5px;}
-  .cn-source .cn-sess>h3,.cn-source .cn-item{cursor:grab;}
-  .cn-source .cn-sess>h3:active,.cn-source .cn-item:active{cursor:grabbing;}
+  .nb-note{font-size:var(--fs-3);color:var(--ink);margin-top:5px;}
+  .nb-source .nb-sess>h3,.nb-source .nb-item{cursor:grab;}
+  .nb-source .nb-sess>h3:active,.nb-source .nb-item:active{cursor:grabbing;}
 
   .layout{display:grid;grid-template-columns:var(--side-w,300px) 1fr;}
 
@@ -1009,8 +1009,8 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   <div class="nav-brand" id="navHome"><svg class="brand-svg" viewBox="0 0 48 24" fill="none" aria-hidden="true"><path d="M3 12 C9 5.5, 15 18.5, 22 12 C29 5.5, 34 16.5, 40 12" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round"/><path d="M40 8.5 L45 12 L40 15.5" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 8.5 V6" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="11" cy="4.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/><path d="M30 14.5 V17.5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="30" cy="19.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/></svg>Memorium</div>
   <div class="nav-tabs">
     <button data-view="dash" class="active">Dashboard</button>
-    <button data-view="carnet">Notebook</button>
-    <button data-view="edition">Organize</button>
+    <button data-view="notebook">Notebook</button>
+    <button data-view="organize">Organize</button>
     <button data-view="manual">Manual</button>
   </div>
   <span class="dirpill" id="dirpill"></span>
@@ -1057,15 +1057,15 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   </div>
 </section>
 
-<section id="view-carnet" class="view">
-  <div class="cn-layout">
-    <div class="cn-source" id="cn-source"></div>
-    <div class="cn-editor">
-      <div class="cn-etop">
-        <span class="cn-title">Notebook</span>
-        <span class="cn-status" id="cn-status"></span>
+<section id="view-notebook" class="view">
+  <div class="nb-layout">
+    <div class="nb-source" id="nb-source"></div>
+    <div class="nb-editor">
+      <div class="nb-etop">
+        <span class="nb-title">Notebook</span>
+        <span class="nb-status" id="nb-status"></span>
       </div>
-      <textarea id="cn-text" spellcheck="false" placeholder="Write here. Drag an annotation from the left to insert it as a quote."></textarea>
+      <textarea id="nb-text" spellcheck="false" placeholder="Write here. Drag an annotation from the left to insert it as a quote."></textarea>
     </div>
   </div>
 </section>
@@ -1136,7 +1136,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   <p>Nothing is uploaded anywhere. The export is plain files on your machine &mdash; which also means a transcript can contain paths, project names and secrets, so look before you share one.</p>
 </div>
 </section>
-<section id="view-edition" class="view">
+<section id="view-organize" class="view">
   <div class="ed-wrap">
     <div class="ed-head">
       <h1>Organize</h1>
@@ -1241,7 +1241,7 @@ async function initStore(){                      // load metadata.json into META
   try{const j=JSON.parse(meta); META={folders:j.folders||{},sessions:j.sessions||{}};}
   catch(e){console.warn("metadata.json unreadable, ignored",e);}
   buildDashboard();
-  if(curView==="carnet") buildCarnet();
+  if(curView==="notebook") buildNotebook();
   if(curView==="read") buildSidebar("");
   if(curSid) document.querySelectorAll(".sess").forEach(e=>e.classList.toggle("active",e.dataset.sid===curSid));
   console.log("[memorium] store OK —",Object.keys(META.folders).length,"folders,",Object.keys(META.sessions).length,"sessions modified");
@@ -1257,7 +1257,7 @@ function updateDirPill(){
 /* ───── Navigation entre vues ───── */
 function setView(v){
   const prev=curView;
-  if(prev==="carnet"&&v!=="carnet")cnFlush();
+  if(prev==="notebook"&&v!=="notebook")nbFlush();
   curView=v;
   document.body.classList.toggle("welcome",v==="welcome");
   if(window.__heroSetActive)window.__heroSetActive(v==="welcome");
@@ -1268,8 +1268,8 @@ function setView(v){
   document.getElementById("pager").style.display = reading?"flex":"none";
   if(v!=="read"){document.getElementById("recap").classList.remove("open");hideBar();closeNote();}
   if(v==="dash")buildDashboard();
-  if(v==="carnet")buildCarnet();
-  if(v==="edition")buildEdition();
+  if(v==="notebook")buildNotebook();
+  if(v==="organize")buildOrganize();
   window.scrollTo({top:0});
 }
 document.querySelectorAll(".nav-tabs button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
@@ -1306,35 +1306,35 @@ function openProject(proj){
 }
 
 /* ───── Editable notebook: left = draggable source, right = editor → notebook.md ───── */
-let cnTimer=null, cnLoaded=false;
-function cnSnippetAnn(m,a){                       // annotation → citation + lien retour
+let nbTimer=null, nbLoaded=false;
+function nbSnippetAnn(m,a){                       // annotation → citation + lien retour
   let s="\n> « "+(a.quote||"").trim()+" »\n";
   if(a.note)s+=a.note.trim()+"\n";
   s+="— ["+effTitle(m)+"](session:"+m.sid+"#"+a.id+")\n";
   return s;
 }
-function cnSnippetSess(m){ return "\n— ["+effTitle(m)+"](session:"+m.sid+")\n"; }
-function cnStatus(state){
-  const el=document.getElementById("cn-status"); if(!el)return;
-  el.className="cn-status"+(state==="saved"?" ok":state==="error"?" err":"");
+function nbSnippetSess(m){ return "\n— ["+effTitle(m)+"](session:"+m.sid+")\n"; }
+function nbStatus(state){
+  const el=document.getElementById("nb-status"); if(!el)return;
+  el.className="nb-status"+(state==="saved"?" ok":state==="error"?" err":"");
   el.textContent=state==="saving"?"✎ saving…":state==="saved"?"✓ saved":state==="error"?"✗ write failed":"";
 }
-function cnSchedule(){ clearTimeout(cnTimer); cnStatus("saving"); cnTimer=setTimeout(cnFlush,600); }
-async function cnFlush(){                         // writes notebook.md; called on debounce AND on view change
-  clearTimeout(cnTimer); cnTimer=null;
-  const ta=document.getElementById("cn-text"); if(!ta||!rootDir)return;
-  try{await writeData("notebook.md",ta.value); cnStatus("saved");}
-  catch(e){cnStatus("error");}
+function nbSchedule(){ clearTimeout(nbTimer); nbStatus("saving"); nbTimer=setTimeout(nbFlush,600); }
+async function nbFlush(){                         // writes notebook.md; called on debounce AND on view change
+  clearTimeout(nbTimer); nbTimer=null;
+  const ta=document.getElementById("nb-text"); if(!ta||!rootDir)return;
+  try{await writeData("notebook.md",ta.value); nbStatus("saved");}
+  catch(e){nbStatus("error");}
 }
-function buildCarnet(){
-  const src=document.getElementById("cn-source"); src.innerHTML="";
-  const ta=document.getElementById("cn-text"); ta.oninput=cnSchedule;
+function buildNotebook(){
+  const src=document.getElementById("nb-source"); src.innerHTML="";
+  const ta=document.getElementById("nb-text"); ta.oninput=nbSchedule;
   // load the notebook once; the flush on view change protects unsaved keystrokes
   // Migration: exports predating the rename hold a carnet.md — adopt it once, losing nothing.
-  if(rootDir && !cnLoaded){ cnLoaded=true; readData("notebook.md").then(async t=>{
+  if(rootDir && !nbLoaded){ nbLoaded=true; readData("notebook.md").then(async t=>{
     if(t===null){ const old=await readData("carnet.md"); if(old!==null){ t=old; await writeData("notebook.md",old); } }
     if(t!==null) ta.value=t; }); }
-  const hint=document.createElement("div"); hint.className="cn-src-hint";
+  const hint=document.createElement("div"); hint.className="nb-src-hint";
   hint.textContent=rootDir?"Drag an annotation or a session into the editor →":"Connect the export folder (pill in the top right) to save your notebook.";
   src.appendChild(hint);
   const g=projectGroups();
@@ -1345,21 +1345,21 @@ function buildCarnet(){
       .map(m=>({m,list:loadAnns(m.sid)})).filter(x=>x.list.length);
     if(!withAnns.length)return;
     const pcount=withAnns.reduce((t,x)=>t+x.list.length,0); total+=pcount;
-    const pd=document.createElement("div"); pd.className="cn-proj";
+    const pd=document.createElement("div"); pd.className="nb-proj";
     pd.innerHTML='<h2>'+esc(folderName(proj))+'<span class="c">'+pcount+' annotation'+(pcount>1?'s':'')+'</span></h2>';
     withAnns.forEach(({m,list})=>{
-      const sd=document.createElement("div"); sd.className="cn-sess";
+      const sd=document.createElement("div"); sd.className="nb-sess";
       const h=document.createElement("h3"); h.textContent=effTitle(m);
       h.draggable=true;
-      h.ondragstart=e=>{e.dataTransfer.setData("text/plain",cnSnippetSess(m));e.dataTransfer.effectAllowed="copy";};
+      h.ondragstart=e=>{e.dataTransfer.setData("text/plain",nbSnippetSess(m));e.dataTransfer.effectAllowed="copy";};
       h.onclick=()=>gotoAnn(m.sid,null); sd.appendChild(h);
       list.slice().sort((a,b)=>a.start-b.start).forEach(a=>{
-        const it=document.createElement("div"); it.className="cn-item";
-        it.innerHTML='<span class="cn-dot" style="background:'+SWVAR[a.color||"1"]+'"></span>'+
-          '<div class="cn-body"><div class="cn-quote">'+esc(a.quote||"")+'</div>'+
-          (a.note?'<div class="cn-note">'+esc(a.note)+'</div>':'')+'</div>';
+        const it=document.createElement("div"); it.className="nb-item";
+        it.innerHTML='<span class="nb-dot" style="background:'+SWVAR[a.color||"1"]+'"></span>'+
+          '<div class="nb-body"><div class="nb-quote">'+esc(a.quote||"")+'</div>'+
+          (a.note?'<div class="nb-note">'+esc(a.note)+'</div>':'')+'</div>';
         it.draggable=true;
-        it.ondragstart=e=>{e.dataTransfer.setData("text/plain",cnSnippetAnn(m,a));e.dataTransfer.effectAllowed="copy";e.stopPropagation();};
+        it.ondragstart=e=>{e.dataTransfer.setData("text/plain",nbSnippetAnn(m,a));e.dataTransfer.effectAllowed="copy";e.stopPropagation();};
         it.onclick=()=>gotoAnn(m.sid,a.id);
         sd.appendChild(it);
       });
@@ -1367,7 +1367,7 @@ function buildCarnet(){
     });
     src.appendChild(pd);
   });
-  if(!total){const e=document.createElement("div");e.className="cn-empty";e.innerHTML="No annotations yet.<br>Highlight a passage in a session to see it appear here.";src.appendChild(e);}
+  if(!total){const e=document.createElement("div");e.className="nb-empty";e.innerHTML="No annotations yet.<br>Highlight a passage in a session to see it appear here.";src.appendChild(e);}
 }
 function gotoAnn(sid,aid){
   afterMountAid=aid;
@@ -1381,7 +1381,7 @@ function flashAnn(aid){
   if(m){m.scrollIntoView({behavior:"smooth",block:"center"});m.classList.add("flash");setTimeout(()=>m.classList.remove("flash"),1100);}
 }
 
-/* ───── Edition : dossiers & sessions (couche metadata.json) ───── */
+/* ───── Organize : dossiers & sessions (couche metadata.json) ───── */
 async function saveMeta(){
   if(!rootDir){alert("Connect the export folder first (pill in the top right).");return false;}
   try{await writeData("metadata.json",JSON.stringify(META,null,2));return true;}
@@ -1393,7 +1393,7 @@ function cleanupSession(sid){                    // drop the entry once no overr
 function refreshAll(){                           // any META mutation affects all three views
   const s=document.getElementById("search");
   if(s.value){s.value="";closeFind();}           // editing resets the search context
-  buildEdition(); buildDashboard(); buildSidebar("");
+  buildOrganize(); buildDashboard(); buildSidebar("");
 }
 async function moveSession(sid,id){              // move a session into folder `id`
   const m=metaOf(sid); if(!m||effFolder(m)===id)return;
@@ -1408,7 +1408,7 @@ function allFolderIds(){
   Object.keys(META.folders).forEach(id=>s.add(id));
   return [...s].filter(id=>!(META.folders[id]&&META.folders[id].deleted));  // hide emptied project folders that were removed
 }
-function buildEdition(){
+function buildOrganize(){
   const body=document.getElementById("ed-body"); body.innerHTML="";
   if(!rootDir){
     body.innerHTML='<div class="ed-empty">To organize your sessions, connect the <b>export</b> folder with the pill in the top right.<br>Changes are stored in <code>data/metadata.json</code>.</div>';
@@ -1478,7 +1478,7 @@ document.getElementById("ed-newfolder").onclick=async()=>{
   const id="f_"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   META.folders[id]={name:"New folder"};
   if(await saveMeta()){
-    buildEdition();
+    buildOrganize();
     const card=document.querySelector('.ed-folder[data-folder="'+id+'"]');
     if(card){card.scrollIntoView({block:"center"}); const inp=card.querySelector(".ed-fname"); if(inp){inp.focus();inp.select();}}
   }
