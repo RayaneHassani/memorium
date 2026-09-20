@@ -192,6 +192,14 @@ def parse(path):
         if o.get("type") == "ai-title" and o.get("aiTitle"):
             page_title = o["aiTitle"]
 
+    # Dossier de travail de la session : `claude --resume` est scopé au cwd, l'ID seul ne suffit pas.
+    # Le nom encodé du dossier projet est lossy (tirets ambigus), seul ce champ donne le chemin réel.
+    cwd = ""
+    for o in raw:
+        if o.get("cwd"):
+            cwd = o["cwd"]
+            break
+
     # map tool_use_id -> texte de résultat
     results = {}
     for o in raw:
@@ -251,6 +259,7 @@ def parse(path):
 
     return {
         "title": page_title or "Conversation Claude Code",
+        "cwd": cwd,
         "sections": [s for s in sections if s["blocks"] or s["prompt"]],
     }
 
@@ -734,6 +743,19 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .dochead h1{font-size:30px;line-height:1.18;margin:0 0 12px;font-weight:700;letter-spacing:-.01em;}
   .dochead .sub{color:var(--muted);font-size:12.5px;}
   .dochead .accent-rule{height:3px;width:60px;background:var(--accent);margin-top:18px;border-radius:2px;}
+  .idbtn{margin-left:12px;background:var(--accent);border:none;color:#fff;border-radius:7px;
+    padding:5px 13px;cursor:pointer;font-size:12.5px;font-weight:600;vertical-align:1px;
+    display:inline-flex;align-items:center;gap:7px;}
+  .idbtn svg{width:13px;height:13px;flex:none;}
+  .idbtn:hover{background:var(--accent-d);}
+  .idcard{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:13px 16px;max-width:720px;}
+  .idrow{display:flex;gap:12px;font-size:12.5px;padding:3px 0;align-items:baseline;}
+  .idrow span{color:var(--muted);min-width:46px;flex:none;}
+  .idrow b{font-weight:600;word-break:break-all;}
+  .idrow b.mono{font-family:var(--mono);font-size:11.5px;font-weight:500;}
+  .idcopy{margin-top:10px;background:var(--accent);border:none;color:#fff;border-radius:6px;
+    padding:6px 13px;cursor:pointer;font-size:12px;}
+  .idcopy:hover{background:var(--accent-d);}
 
   .exchange{display:grid;grid-template-columns:74px minmax(0,720px) 286px;column-gap:30px;justify-content:center;position:relative;margin:0 0 78px;}
   .exchange-n{grid-column:1;text-align:right;font-size:30px;font-weight:700;color:var(--accent);
@@ -1402,6 +1424,32 @@ function buildSidebar(filter){
 
 /* ───── Chargement paresseux ───── */
 window.__loadSession=function(sid,payload){cache[sid]=payload; if(pendingSid===sid)mount(sid);};
+function copyText(t){                            // navigator.clipboard exige un secure context : absent en file://
+  if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(t);
+  const ta=document.createElement("textarea"); ta.value=t;
+  ta.style.cssText="position:fixed;opacity:0"; document.body.appendChild(ta); ta.select();
+  try{document.execCommand("copy");}finally{ta.remove();}
+  return Promise.resolve();
+}
+function buildIdCard(sid){                       // identité de la session : de quoi la relancer dans Claude Code
+  const m=metaOf(sid); if(!m)return;
+  const sub=viewer.querySelector(".sub"); if(!sub)return;
+  const btn=document.createElement("button"); btn.className="idbtn"; btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M3.2 4.2 V9.4 H8.4" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Reprendre cette session</span>';
+  btn.title="Identité de la session";
+  const card=document.createElement("div"); card.className="idcard"; card.style.display="none";
+  const cmd='cd "'+m.cwd+'"\nclaude --resume '+sid;
+  card.innerHTML=
+    '<div class="idrow"><span>Nom</span><b>'+esc(effTitle(m))+'</b></div>'+
+    '<div class="idrow"><span>Date</span><b>'+esc(m.date)+'</b></div>'+
+    '<div class="idrow"><span>Dans</span><b class="mono">'+esc(m.cwd)+'</b></div>'+
+    '<div class="idrow"><span>ID</span><b class="mono">'+esc(sid)+'</b></div>';
+  const cp=document.createElement("button"); cp.className="idcopy"; cp.textContent="Copier la commande de reprise";
+  cp.onclick=()=>{copyText(cmd); cp.textContent="✓ Copié"; setTimeout(()=>cp.textContent="Copier la commande de reprise",2000);};
+  card.appendChild(cp);
+  btn.onclick=()=>{card.style.display=card.style.display==="none"?"block":"none";};
+  sub.appendChild(btn);
+  sub.parentNode.insertBefore(card,sub.nextSibling);
+}
 function openSession(sid){
   if(curView!=="read")setView("read");
   pendingSid=sid;
@@ -1418,6 +1466,7 @@ function mount(sid){
   const p=cache[sid]; if(!p)return;
   emptyread.style.display="none";
   viewer.innerHTML=p.html;
+  buildIdCard(sid);
   // La sidebar suit la session ouverte : re-scope si on arrive d'un autre dossier (ex. résultat de recherche).
   const mo=metaOf(sid), proj=mo?effFolder(mo):null;
   if(proj && proj!==curProject){curProject=proj;buildSidebar("");}
@@ -2215,7 +2264,7 @@ def main():
         })
         search_index[sid] = plain_text(data["title"] + " " + inner["html"])
         manifest.append({
-            "sid": sid, "project": proj, "title": data["title"],
+            "sid": sid, "project": proj, "title": data["title"], "cwd": data["cwd"],
             "prompts": inner["count"], "mtime": int(mtime),
             "date": datetime.datetime.fromtimestamp(mtime).strftime("%d %b %Y"),
         })
