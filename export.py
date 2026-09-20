@@ -744,6 +744,19 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .dochead .sub{color:var(--muted);font-size:12.5px;}
   .dochead .accent-rule{height:3px;width:60px;background:var(--accent);margin-top:18px;border-radius:2px;}
   button{font-family:inherit;}
+  .man{max-width:760px;margin:0 auto;padding:34px 26px 100px;}
+  .man h1{font-size:30px;margin:0 0 10px;letter-spacing:-.01em;}
+  .man .lede{color:var(--muted);font-size:13.5px;line-height:1.7;margin:0 0 6px;}
+  .man .accent-rule{height:3px;width:60px;background:var(--accent);margin:18px 0 34px;border-radius:2px;}
+  .man h2{font-size:17px;margin:38px 0 12px;padding-top:22px;border-top:1px solid var(--line);}
+  .man h3{font-size:13.5px;margin:22px 0 8px;color:var(--accent-d);text-transform:uppercase;letter-spacing:.08em;}
+  .man p{font-size:13.5px;line-height:1.75;margin:0 0 13px;}
+  .man li{font-size:13.5px;line-height:1.7;margin-bottom:7px;}
+  .man .note{background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:9px;padding:13px 17px;margin:18px 0;font-size:13px;line-height:1.7;}
+  .man .bash{margin:14px 0 6px;}
+  .man .cmdrow{display:flex;align-items:center;gap:12px;margin:0 0 22px;}
+  .man .cmdrow .idbtn{margin-left:0;}
   .idbtn{margin-left:12px;background:var(--accent);border:none;color:#fff;border-radius:7px;
     padding:5px 13px;cursor:pointer;font-size:12.5px;font-weight:600;vertical-align:1px;
     display:inline-flex;align-items:center;gap:7px;}
@@ -988,6 +1001,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     <button data-view="dash" class="active">Dashboard</button>
     <button data-view="carnet">Carnet</button>
     <button data-view="edition">Edition</button>
+    <button data-view="manual">Manual</button>
   </div>
   <span class="dirpill" id="dirpill"></span>
 </nav>
@@ -1046,6 +1060,72 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   </div>
 </section>
 
+<section id="view-manual" class="view">
+<div class="man">
+  <h1>Manual</h1>
+  <p class="lede">What Memorium does, how your sessions are stored, and how to bring one back into Claude Code.</p>
+  <div class="accent-rule"></div>
+
+  <h2>What Memorium is</h2>
+  <p>Every time you work with Claude Code, the whole exchange is written to disk as a JSONL file &mdash; one line per event, prompts and tool calls included. Those files are the raw record of how your project was actually built: which options were weighed, which one was picked, and why. They are also unreadable in practice, scattered across encoded folder names, and deleted on a timer.</p>
+  <p>Memorium turns that raw record into a static HTML journal you can read, search, annotate and keep. No server, no database, no account: one Python file reads the JSONL and writes a folder of HTML you can open anywhere.</p>
+  <p>The point is not nostalgia. It is <b>provenance</b>. Six months from now, a line of code will make no sense to anyone, including you. The commit message will say <i>what</i> changed. Memorium is where you find <i>why</i> &mdash; the session where the trade-off was argued and settled.</p>
+
+  <h2>Where your sessions live</h2>
+  <p>Claude Code stores each session as a single file:</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>ls ~/.claude/projects/&lt;encoded-project-path&gt;/&lt;session-id&gt;.jsonl</div></div>
+  <p>The folder name is the project path with separators replaced by dashes, which makes it ambiguous to read back &mdash; a dash in your folder name is indistinguishable from a separator. That is why Memorium reads the real working directory from inside the file instead of guessing it from the folder name.</p>
+  <div class="note"><b>These files are deleted automatically.</b> Claude Code removes anything older than <code>cleanupPeriodDays</code>, which defaults to <b>30 days</b>. No warning, no recycle bin. A session you have not touched in a month is simply gone, and with it every decision it recorded.</div>
+
+  <h2>Resume a session in Claude Code</h2>
+  <p>Open any session in Memorium and click <b>Resume this session</b> under its title. The panel shows its name, date, working directory and full ID, and the button copies a two-line command to your clipboard. Paste it into a terminal:</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>cd "C:\Users\you\projects\your-project"</div><div class="term-cmd"><span class="prompt">$</span>claude --resume 8f2c41ab-...</div></div>
+  <p>You get the conversation back exactly where you left it: full history, full context, same working directory. Claude Code picks up as if you had never closed the window.</p>
+  <h3>Why the first line matters</h3>
+  <p><code>--resume</code> only looks for sessions belonging to the <b>current</b> directory. Run it from the wrong place and Claude Code will tell you the session does not exist, even though the ID is correct and the file is right there on disk. The <code>cd</code> is not decoration.</p>
+
+  <h2>--continue is not --resume</h2>
+  <p>Two flags, two different jobs, and the difference bites people who close an editor with several sessions open.</p>
+  <p><code>claude --continue</code> takes no argument. It reopens <b>the most recent</b> conversation for the current directory &mdash; always the same one, no matter how many times you run it. If you were working across five parallel sessions, four of them are unreachable this way. They are not lost; they are simply not what that flag means.</p>
+  <p><code>claude --resume &lt;id&gt;</code> targets one precise session. Running <code>claude --resume</code> with no ID opens a picker instead, which lists sessions by title &mdash; useful when you remember what you were doing, useless when five sessions share a vague title. That is the gap Memorium fills: full-text search across every transcript, then one click to copy the exact command for the one you found.</p>
+
+  <h2>Stop losing sessions</h2>
+  <p>The single most valuable thing you can do is raise the retention window before it deletes anything. In <code>~/.claude/settings.json</code>:</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>"cleanupPeriodDays": 3650</div></div>
+  <p>Ten years instead of thirty days. This is a Claude Code setting, not a Memorium one &mdash; it works whether or not you use this tool, and it is the only thing that prevents deletion at the source. Everything else is a copy made after the fact.</p>
+
+  <h2>Command line</h2>
+  <p>Five commands, and they do not carry equal weight. <code>init</code> is the one that protects you; <code>archive</code> and <code>restore</code> are what save you when the machine itself is gone.</p>
+
+  <h3>memorium init &mdash; start here</h3>
+  <p>One command, run once. It raises <code>cleanupPeriodDays</code> so Claude Code stops deleting your sessions, and installs a <code>SessionEnd</code> hook so every conversation is archived the moment it ends. It prints exactly what it will write to your settings, backs up the file first, and asks before touching anything. Nothing to remember afterwards.</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium init</div></div>
+  <p>If you run only one command from this page, run this one. Raising the retention window is what actually prevents deletion; everything else is a copy made after the fact.</p>
+
+  <h3>memorium archive</h3>
+  <p>Copies the raw JSONL files out of <code>~/.claude/projects</code> into a compressed archive of your own, skipping anything already saved. Runs by itself once <code>init</code> is done; run it by hand any time you want.</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium archive</div></div>
+  <p>Why raw files and not the HTML: the journal lets you <i>read</i> a session, but Claude Code can only reopen the original file. A rendering is not a session.</p>
+
+  <h3>memorium restore</h3>
+  <p>Puts an archived session back where Claude Code expects it, so <code>claude --resume</code> works on it again.</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium restore 8f2c41ab-...</div></div>
+  <p>This is the one people misread. With <code>init</code> in place nothing gets purged, so restoring after a deletion becomes rare. What stays common is everything else: <b>a new machine, a reinstall, a dead disk, or simply a second computer.</b> Retention settings protect a folder on one machine; they do nothing when that machine is gone. Your archive travels, and this is what makes it usable again on the other side.</p>
+  <p>It refuses to overwrite a session that still exists locally &mdash; the live file may be newer than the archive, and losing real work to a stale copy is worse than any purge. Pass <code>--force</code> when you know the archive is the version you want. An ID prefix is enough, like a commit hash.</p>
+
+  <h3>memorium</h3>
+  <p>Reads every session and writes the HTML journal to <code>./export</code>, then opens it in your browser.</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium</div></div>
+
+  <h3>memorium serve</h3>
+  <p>Same build, then serves it on <code>http://localhost:8137</code>. Required for editing: renaming, moving sessions and the notebook all write to disk through the File System Access API, which browsers disable on <code>file://</code> pages. Reading works fine either way.</p>
+  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium serve</div></div>
+
+  <h2>What Memorium never does</h2>
+  <p>It never modifies your JSONL files. Renaming a session or moving it to another folder writes to a separate metadata layer inside the export, so Claude Code and any other tool reading those files keep working exactly as before. Delete the export folder and you lose annotations, not history.</p>
+  <p>Nothing is uploaded anywhere. The export is plain files on your machine &mdash; which also means a transcript can contain paths, project names and secrets, so look before you share one.</p>
+</div>
+</section>
 <section id="view-edition" class="view">
   <div class="ed-wrap">
     <div class="ed-head">
@@ -1435,21 +1515,30 @@ function copyText(t){                            // navigator.clipboard exige un
 function buildIdCard(sid){                       // identité de la session : de quoi la relancer dans Claude Code
   const m=metaOf(sid); if(!m)return;
   const sub=viewer.querySelector(".sub"); if(!sub)return;
-  const btn=document.createElement("button"); btn.className="idbtn"; btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M3.2 4.2 V9.4 H8.4" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Reprendre cette session</span>';
-  btn.title="Identité de la session";
+  const btn=document.createElement("button"); btn.className="idbtn"; btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M3.2 4.2 V9.4 H8.4" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Resume this session</span>';
+  btn.title="Session identity";
   const card=document.createElement("div"); card.className="idcard"; card.style.display="none";
   const cmd='cd "'+m.cwd+'"\nclaude --resume '+sid;
   card.innerHTML=
-    '<div class="idrow"><span>Nom</span><b>'+esc(effTitle(m))+'</b></div>'+
+    '<div class="idrow"><span>Name</span><b>'+esc(effTitle(m))+'</b></div>'+
     '<div class="idrow"><span>Date</span><b>'+esc(m.date)+'</b></div>'+
-    '<div class="idrow"><span>Dans</span><b class="mono">'+esc(m.cwd)+'</b></div>'+
+    '<div class="idrow"><span>Directory</span><b class="mono">'+esc(m.cwd)+'</b></div>'+
     '<div class="idrow"><span>ID</span><b class="mono">'+esc(sid)+'</b></div>';
-  const cp=document.createElement("button"); cp.className="idcopy"; cp.textContent="Copier la commande de reprise";
-  cp.onclick=()=>{copyText(cmd); cp.textContent="✓ Copié"; setTimeout(()=>cp.textContent="Copier la commande de reprise",2000);};
+  const cp=document.createElement("button"); cp.className="idcopy"; cp.textContent="Copy resume command";
+  cp.onclick=()=>{copyText(cmd); cp.textContent="✓ Copié"; setTimeout(()=>cp.textContent="Copy resume command",2000);};
   card.appendChild(cp);
   btn.onclick=()=>{card.style.display=card.style.display==="none"?"block":"none";};
   sub.appendChild(btn);
   sub.parentNode.insertBefore(card,sub.nextSibling);
+}
+function initManualCopy(){                       // chaque bloc du manuel reçoit le bouton de copie du panneau d'identité
+  document.querySelectorAll("#view-manual .bash").forEach(b=>{
+    const cmd=[...b.querySelectorAll(".term-cmd")].map(l=>l.textContent.replace(/^\$\s*/,"")).join("\n");
+    const row=document.createElement("div"); row.className="cmdrow";
+    const btn=document.createElement("button"); btn.className="idbtn"; btn.textContent="Copy";
+    btn.onclick=()=>{copyText(cmd); btn.textContent="Copied"; setTimeout(()=>btn.textContent="Copy",2000);};
+    b.parentNode.insertBefore(row,b.nextSibling); row.appendChild(btn);
+  });
 }
 function openSession(sid){
   if(curView!=="read")setView("read");
@@ -2152,6 +2241,7 @@ window.__heroSetActive=function(on){
 
 buildSidebar("");
 buildDashboard();
+initManualCopy();
 restoreDir();
 const hash=location.hash.slice(1);
 if(hash && MANIFEST.some(m=>m.sid===hash)){openSession(hash);}
