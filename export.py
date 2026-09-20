@@ -606,9 +606,9 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     font-weight:600;cursor:pointer;}
   #ed-newfolder:hover,.idbtn:hover,.idcopy:hover,#notepop .save:hover,.enter-btn:hover{
     background:var(--accent-d);border-color:var(--accent-d);}
-  .ed-del,#notepop button{
+  .ed-del,#notepop button,.nb-etop button{
     background:var(--white);color:var(--muted);border:1px solid var(--line);border-radius:var(--r-2);cursor:pointer;}
-  .ed-del:hover,#notepop button:hover{color:var(--ink);border-color:var(--muted);}
+  .ed-del:hover,#notepop button:hover,.nb-etop button:hover{color:var(--ink);border-color:var(--muted);}
   #seltools .cmt,#pager button,#findbar button{
     background:none;border:none;color:var(--on-dark);cursor:pointer;}
   #seltools .cmt:hover,#pager button:hover,#findbar button:hover{background:var(--olive-ddd);color:var(--accent2-l);}
@@ -660,7 +660,8 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .nb-src-hint{font-size:var(--fs-2);color:var(--muted);font-style:italic;line-height:1.5;padding:2px 2px 10px;border-bottom:1px dashed var(--line);margin-bottom:6px;}
   .nb-editor{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--paper);}
   .nb-etop{display:flex;align-items:center;gap:12px;padding:16px 26px 12px;border-bottom:1px solid var(--line);}
-  .nb-etop .nb-title{font-size:var(--fs-5);font-weight:800;letter-spacing:-.01em;}
+  .nb-etop select{font:inherit;font-size:var(--fs-4);font-weight:700;max-width:280px;padding:4px 8px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--white);color:var(--ink);}
+  .nb-etop button{font-size:var(--fs-2);padding:4px 10px;}
   .nb-status{margin-left:auto;font-size:var(--fs-2);color:var(--muted);}
   .nb-status.ok{color:var(--accent2);} .nb-status.err{color:var(--accent-d);}
   #nb-text{flex:1;width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--ink);
@@ -1062,7 +1063,8 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     <div class="nb-source" id="nb-source"></div>
     <div class="nb-editor">
       <div class="nb-etop">
-        <span class="nb-title">Notebook</span>
+        <select id="nb-select" aria-label="Note"></select>
+        <button id="nb-new">New</button><button id="nb-ren">Rename</button><button id="nb-del">Delete</button>
         <span class="nb-status" id="nb-status"></span>
       </div>
       <textarea id="nb-text" spellcheck="false" placeholder="Write here. Drag an annotation from the left to insert it as a quote."></textarea>
@@ -1306,7 +1308,7 @@ function openProject(proj){
 }
 
 /* ───── Editable notebook: left = draggable source, right = editor → notebook.md ───── */
-let nbTimer=null, nbLoaded=false;
+let nbTimer=null, nbLoaded=false, nbNotes=[], nbCur=null;
 function nbSnippetAnn(m,a){                       // annotation → citation + lien retour
   let s="\n> « "+(a.quote||"").trim()+" »\n";
   if(a.note)s+=a.note.trim()+"\n";
@@ -1320,20 +1322,99 @@ function nbStatus(state){
   el.textContent=state==="saving"?"✎ saving…":state==="saved"?"✓ saved":state==="error"?"✗ write failed":"";
 }
 function nbSchedule(){ clearTimeout(nbTimer); nbStatus("saving"); nbTimer=setTimeout(nbFlush,600); }
-async function nbFlush(){                         // writes notebook.md; called on debounce AND on view change
+async function nbFlush(){                         // writes the open note; called on debounce AND on view change
   clearTimeout(nbTimer); nbTimer=null;
-  const ta=document.getElementById("nb-text"); if(!ta||!rootDir)return;
-  try{await writeData("notebook.md",ta.value); nbStatus("saved");}
+  const ta=document.getElementById("nb-text"); if(!ta||!rootDir||nbCur===null)return;
+  const name=nbCur, text=ta.value;
+  try{await nbWrite(name,text); nbStatus("saved");}
   catch(e){nbStatus("error");}
+}
+/* notes live in data/notes/<title>.md: the file name is the title, no extra index to keep in sync */
+async function notesDir(create){
+  const d=await dataDir(); if(!d)return null;
+  try{return await d.getDirectoryHandle("notes",{create:!!create});}catch(e){return null;}
+}
+async function nbList(){
+  const d=await notesDir(); const out=[]; if(!d)return out;
+  for await(const [n,h] of d.entries()) if(h.kind==="file"&&n.endsWith(".md")) out.push(n.slice(0,-3));
+  return out.sort((a,b)=>a.localeCompare(b));
+}
+async function nbRead(name){
+  const d=await notesDir(); if(!d)return "";
+  try{return await (await (await d.getFileHandle(name+".md")).getFile()).text();}catch(e){return "";}
+}
+async function nbWrite(name,text){
+  const d=await notesDir(true);
+  const w=await (await d.getFileHandle(name+".md",{create:true})).createWritable();
+  await w.write(text); await w.close();
+}
+async function nbRemove(name){ const d=await notesDir(); if(d)await d.removeEntry(name+".md"); }
+function nbSafe(v){ return (v||"").replace(/[\\/:*?"<>|]/g,"").trim().slice(0,80).replace(/[. ]+$/,""); }
+function nbUnique(base){
+  let n=base, i=2; while(nbNotes.includes(n))n=base+" "+i++;
+  return n;
+}
+function nbBar(){
+  const sel=document.getElementById("nb-select"); if(!sel)return;
+  sel.innerHTML=""; nbNotes.forEach(n=>{const o=document.createElement("option");o.value=n;o.textContent=n;sel.appendChild(o);});
+  if(nbCur!==null)sel.value=nbCur;
+  const on=!!rootDir;
+  ["nb-select","nb-new","nb-ren","nb-del"].forEach(id=>document.getElementById(id).disabled=!on);
+}
+async function nbOpen(name){
+  const ta=document.getElementById("nb-text");
+  await nbFlush();
+  ta.disabled=true; ta.value=await nbRead(name); ta.disabled=false;
+  nbCur=name; nbBar();
+  try{localStorage.setItem("memorium-note",name);}catch(e){}
+}
+async function nbInit(){
+  nbLoaded=true;
+  // First run only: the former single notebook (or the legacy carnet.md) becomes the first note.
+  // Keyed on the notes folder not existing yet, so deleting every note later never resurrects it.
+  const first=(await notesDir(false))===null;
+  if(first){
+    let t=await readData("notebook.md"); if(t===null)t=await readData("carnet.md");
+    await nbWrite("Notebook",t||"");
+  }
+  nbNotes=await nbList();
+  if(!nbNotes.length){await nbWrite("Untitled",""); nbNotes=["Untitled"];}
+  let last=null; try{last=localStorage.getItem("memorium-note");}catch(e){}
+  await nbOpen(nbNotes.includes(last)?last:nbNotes[0]);
+}
+async function nbNew(){
+  const v=prompt("Note title:","Untitled"); if(v===null)return; const t=nbSafe(v); if(!t)return;
+  const name=nbUnique(t); await nbFlush(); await nbWrite(name,"");
+  nbNotes=await nbList(); await nbOpen(name);
+}
+async function nbRename(){
+  const v=prompt("Rename note:",nbCur); if(v===null)return; const t=nbSafe(v);
+  if(!t||t===nbCur)return;
+  if(nbNotes.includes(t)){alert("A note with that name already exists.");return;}
+  await nbFlush();
+  const ta=document.getElementById("nb-text");
+  await nbWrite(t,ta.value); await nbRemove(nbCur);
+  nbNotes=await nbList(); nbCur=t; nbBar();
+  try{localStorage.setItem("memorium-note",t);}catch(e){}
+}
+async function nbDelete(){
+  if(!confirm('Delete the note "'+nbCur+'"? This removes its file.'))return;
+  clearTimeout(nbTimer); nbTimer=null;
+  await nbRemove(nbCur); nbCur=null;
+  nbNotes=await nbList();
+  if(!nbNotes.length){await nbWrite("Untitled",""); nbNotes=["Untitled"];}
+  await nbOpen(nbNotes[0]);
 }
 function buildNotebook(){
   const src=document.getElementById("nb-source"); src.innerHTML="";
   const ta=document.getElementById("nb-text"); ta.oninput=nbSchedule;
-  // load the notebook once; the flush on view change protects unsaved keystrokes
-  // Migration: exports predating the rename hold a carnet.md — adopt it once, losing nothing.
-  if(rootDir && !nbLoaded){ nbLoaded=true; readData("notebook.md").then(async t=>{
-    if(t===null){ const old=await readData("carnet.md"); if(old!==null){ t=old; await writeData("notebook.md",old); } }
-    if(t!==null) ta.value=t; }); }
+  // notes are loaded once; the flush on view change protects unsaved keystrokes
+  nbBar();
+  if(rootDir && !nbLoaded)nbInit();
+  document.getElementById("nb-select").onchange=e=>nbOpen(e.target.value);
+  document.getElementById("nb-new").onclick=nbNew;
+  document.getElementById("nb-ren").onclick=nbRename;
+  document.getElementById("nb-del").onclick=nbDelete;
   const hint=document.createElement("div"); hint.className="nb-src-hint";
   hint.textContent=rootDir?"Drag an annotation or a session into the editor →":"Connect the export folder (pill in the top right) to save your notebook.";
   src.appendChild(hint);
