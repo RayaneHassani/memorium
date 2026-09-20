@@ -483,22 +483,19 @@ def render_blocks(blocks, sidx):
         elif k == "bash":
             head = esc(b["cmd"]) if b["cmd"] else esc(b.get("desc", ""))
             out = b.get("out", "")
-            nlines = count_lines(out)
-            cls = "term-out err" if b.get("err") else "term-out"
-            if out and nlines > 15:
-                preview = "\n".join(out.splitlines()[:15])
-                body = (
-                    f'<div class="{cls} anno" data-bid="{bid()}">{esc(preview)}</div>'
-                    f'<details class="more"><summary>+ {nlines - 15} lignes</summary>'
-                    f'<div class="{cls} anno" data-bid="{bid()}">{esc(out)}</div></details>'
+            err = " err" if b.get("err") else ""
+            if out:
+                n = count_lines(out)
+                parts.append(
+                    f'<div class="bash{err}"><details><summary class="term-cmd"><span class="ps">$</span>'
+                    f'<span class="ctext">{head}</span><span class="lc">{n} line{"" if n == 1 else "s"}</span></summary>'
+                    f'<div class="term-out anno" data-bid="{bid()}">{esc(out)}</div></details></div>'
                 )
-            elif out:
-                body = f'<div class="{cls} anno" data-bid="{bid()}">{esc(out)}</div>'
             else:
-                body = ""
-            parts.append(
-                f'<div class="bash"><div class="term-cmd"><span class="prompt">$</span> {head}</div>{body}</div>'
-            )
+                parts.append(
+                    f'<div class="bash{err}"><div class="term-cmd"><span class="ps">$</span>'
+                    f'<span class="ctext">{head}</span></div></div>'
+                )
         elif k == "agent":
             inner = md_to_html(b["out"]) if b.get("out") else ""
             parts.append(
@@ -819,15 +816,18 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .tool-icon{color:var(--accent2);}
 
   .bash{margin:16px 0;border-radius:var(--r-2);overflow:hidden;border:1px solid var(--term-edge);box-shadow:0 2px 12px rgba(0,0,0,.13);font-size:var(--fs-3);}
-  .term-cmd{background:var(--term-edge);color:var(--term-ink);padding:8px 13px;font-family:var(--mono);}
-  .term-cmd .prompt{color:var(--term-green);margin-right:7px;font-weight:700;}
+  .term-cmd{display:flex;align-items:baseline;gap:9px;background:var(--term-edge);color:var(--term-ink);padding:8px 13px;font-family:var(--mono);}
+  .term-cmd .ps{flex:none;width:1ch;color:var(--term-green);opacity:.55;user-select:none;}
+  .bash.err .term-cmd .ps{color:var(--term-amber);opacity:.9;}
+  .term-cmd .ctext{min-width:0;white-space:pre-wrap;word-break:break-word;}
+  .term-cmd .lc{flex:none;margin-left:auto;padding-left:12px;font-size:var(--fs-1);color:var(--accent2-l);opacity:.6;}
+  .bash summary.term-cmd{cursor:pointer;list-style:none;}
+  .bash summary.term-cmd::-webkit-details-marker{display:none;}
+  .bash summary.term-cmd::before{content:"▸";flex:none;color:var(--accent2-l);opacity:.6;}
+  .bash details[open] > summary.term-cmd::before{content:"▾";}
+  .bash details:not([open]) .ctext{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .term-out{background:var(--term-bg);color:var(--term-ink);padding:10px 13px;white-space:pre-wrap;word-break:break-word;line-height:1.5;font-family:var(--mono);}
-  .term-out.err{color:var(--term-amber);}
-  details.more summary{background:var(--term-bg);color:var(--accent2-l);padding:6px 13px;cursor:pointer;font-size:var(--fs-2);border-top:1px solid var(--term-line);list-style:none;}
-  details.more summary::-webkit-details-marker{display:none;}
-  details.more summary:before{content:"▸ ";}
-  details.more[open] summary:before{content:"▾ ";}
-  details.more .term-out{border-top:1px solid var(--term-line);}
+  .bash.err .term-out{color:var(--term-amber);}
 
   details.agent{margin:13px 0;border:1px dashed var(--line);border-radius:var(--r-2);background:#FBFAF6;}
   details.agent summary{cursor:pointer;padding:9px 14px;font-size:var(--fs-2);color:var(--muted);}
@@ -1083,13 +1083,13 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 
   <h2>Where your sessions live</h2>
   <p>Claude Code stores each session as a single file:</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>ls ~/.claude/projects/&lt;encoded-project-path&gt;/&lt;session-id&gt;.jsonl</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>ls ~/.claude/projects/&lt;encoded-project-path&gt;/&lt;session-id&gt;.jsonl</div></div>
   <p>The folder name is the project path with separators replaced by dashes, which makes it ambiguous to read back &mdash; a dash in your folder name is indistinguishable from a separator. That is why Memorium reads the real working directory from inside the file instead of guessing it from the folder name.</p>
   <div class="note"><b>These files are deleted automatically.</b> Claude Code removes anything older than <code>cleanupPeriodDays</code>, which defaults to <b>30 days</b>. No warning, no recycle bin. A session you have not touched in a month is simply gone, and with it every decision it recorded.</div>
 
   <h2>Resume a session in Claude Code</h2>
   <p>Open any session in Memorium and click <b>Resume this session</b> under its title. The panel shows its name, date, working directory and full ID, and the button copies a two-line command to your clipboard. Paste it into a terminal:</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>cd "C:\Users\you\projects\your-project"</div><div class="term-cmd"><span class="prompt">$</span>claude --resume 8f2c41ab-...</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>cd "C:\Users\you\projects\your-project"</div><div class="term-cmd"><span class="ps">$</span>claude --resume 8f2c41ab-...</div></div>
   <p>You get the conversation back exactly where you left it: full history, full context, same working directory. Claude Code picks up as if you had never closed the window.</p>
   <h3>Why the first line matters</h3>
   <p><code>--resume</code> only looks for sessions belonging to the <b>current</b> directory. Run it from the wrong place and Claude Code will tell you the session does not exist, even though the ID is correct and the file is right there on disk. The <code>cd</code> is not decoration.</p>
@@ -1101,7 +1101,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 
   <h2>Stop losing sessions</h2>
   <p>The single most valuable thing you can do is raise the retention window before it deletes anything. In <code>~/.claude/settings.json</code>:</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>"cleanupPeriodDays": 3650</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>"cleanupPeriodDays": 3650</div></div>
   <p>Ten years instead of thirty days. This is a Claude Code setting, not a Memorium one &mdash; it works whether or not you use this tool, and it is the only thing that prevents deletion at the source. Everything else is a copy made after the fact.</p>
 
   <h2>Command line</h2>
@@ -1109,27 +1109,27 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 
   <h3>memorium init &mdash; start here</h3>
   <p>One command, run once. It raises <code>cleanupPeriodDays</code> so Claude Code stops deleting your sessions, and installs a <code>SessionEnd</code> hook so every conversation is archived the moment it ends. It prints exactly what it will write to your settings, backs up the file first, and asks before touching anything. Nothing to remember afterwards.</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium init</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>memorium init</div></div>
   <p>If you run only one command from this page, run this one. Raising the retention window is what actually prevents deletion; everything else is a copy made after the fact.</p>
 
   <h3>memorium archive</h3>
   <p>Copies the raw JSONL files out of <code>~/.claude/projects</code> into a compressed archive of your own, skipping anything already saved. Runs by itself once <code>init</code> is done; run it by hand any time you want.</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium archive</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>memorium archive</div></div>
   <p>Why raw files and not the HTML: the journal lets you <i>read</i> a session, but Claude Code can only reopen the original file. A rendering is not a session.</p>
 
   <h3>memorium restore</h3>
   <p>Puts an archived session back where Claude Code expects it, so <code>claude --resume</code> works on it again.</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium restore 8f2c41ab-...</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>memorium restore 8f2c41ab-...</div></div>
   <p>This is the one people misread. With <code>init</code> in place nothing gets purged, so restoring after a deletion becomes rare. What stays common is everything else: <b>a new machine, a reinstall, a dead disk, or simply a second computer.</b> Retention settings protect a folder on one machine; they do nothing when that machine is gone. Your archive travels, and this is what makes it usable again on the other side.</p>
   <p>It refuses to overwrite a session that still exists locally &mdash; the live file may be newer than the archive, and losing real work to a stale copy is worse than any purge. Pass <code>--force</code> when you know the archive is the version you want. An ID prefix is enough, like a commit hash.</p>
 
   <h3>memorium</h3>
   <p>Reads every session and writes the HTML journal to <code>./export</code>, then opens it in your browser.</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>memorium</div></div>
 
   <h3>memorium serve</h3>
   <p>Same build, then serves it on <code>http://localhost:8137</code>. Required for editing: renaming, moving sessions and the notebook all write to disk through the File System Access API, which browsers disable on <code>file://</code> pages. Reading works fine either way.</p>
-  <div class="bash"><div class="term-cmd"><span class="prompt">$</span>memorium serve</div></div>
+  <div class="bash"><div class="term-cmd"><span class="ps">$</span>memorium serve</div></div>
 
   <h2>What Memorium never does</h2>
   <p>It never modifies your JSONL files. Renaming a session or moving it to another folder writes to a separate metadata layer inside the export, so Claude Code and any other tool reading those files keep working exactly as before. Delete the export folder and you lose annotations, not history.</p>
