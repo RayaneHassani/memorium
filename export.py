@@ -743,6 +743,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .dochead h1{font-size:30px;line-height:1.18;margin:0 0 12px;font-weight:700;letter-spacing:-.01em;}
   .dochead .sub{color:var(--muted);font-size:12.5px;}
   .dochead .accent-rule{height:3px;width:60px;background:var(--accent);margin-top:18px;border-radius:2px;}
+  button{font-family:inherit;}
   .idbtn{margin-left:12px;background:var(--accent);border:none;color:#fff;border-radius:7px;
     padding:5px 13px;cursor:pointer;font-size:12.5px;font-weight:600;vertical-align:1px;
     display:inline-flex;align-items:center;gap:7px;}
