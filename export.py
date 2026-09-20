@@ -13,13 +13,19 @@ Usage :
     memorium                # exporte ~/.claude/projects → ./export, ouvre le navigateur
     memorium <dossier>      # dossier de sortie personnalisé
     memorium serve          # sert ./export sur http://localhost:8137 (débloque l'écriture)
+    memorium archive        # sauvegarde gzip incrémentale des .jsonl hors de ~/.claude
+    memorium restore <id>   # remet une session archivée là où Claude Code la cherche
+    memorium init           # relève la rétention + installe le hook d'archivage (avec accord)
     python export.py        # équivalent sans installation
 """
 
-import sys, os, json, re, html, glob, webbrowser, datetime
+import sys, os, json, re, html, glob, gzip, shutil, webbrowser, datetime
 
 # Source des sessions : ~/.claude/projects par défaut, surchargeable (démo, tests, CI)
 PROJECTS_DIR = os.environ.get("MEMORIUM_PROJECTS_DIR") or os.path.join(os.path.expanduser("~"), ".claude", "projects")
+
+# Archive des .jsonl bruts : hors de ~/.claude, que Claude Code purge au-delà de cleanupPeriodDays.
+ARCHIVE_DIR = os.environ.get("MEMORIUM_ARCHIVE_DIR") or os.path.join(os.path.expanduser("~"), ".memorium", "archive")
 
 # ─────────────────────────── Découverte des sessions ───────────────────────────
 
@@ -2313,6 +2319,293 @@ def serve(out_dir, port=8137):
         print("\n  ✓ Serveur arrêté.")
 
 
+# ─────────────────────────── Archivage des sources ───────────────────────────
+
+def archive_sessions(dest_root=None):
+    """Copie gzip incrémentale des .jsonl vers l'archive. Le HTML se lit, seul le brut se relance."""
+    dest_root = dest_root or ARCHIVE_DIR
+    os.makedirs(dest_root, exist_ok=True)
+    index_path = os.path.join(dest_root, "index.json")
+
+    index = {}
+    if os.path.isfile(index_path):
+        try:
+            with open(index_path, encoding="utf-8") as f:
+                index = json.load(f)
+        except Exception:
+            index = {}          # index illisible : on réarchive tout plutôt que d'abandonner
+
+    paths = glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl"))
+    paths = [p for p in paths if "observer-sessions" not in os.path.dirname(p)]
+
+    added = refreshed = unchanged = failed = 0
+    raw_bytes = gz_bytes = 0
+    for path in sorted(paths):
+        sid = os.path.splitext(os.path.basename(path))[0]
+        proj_dir = os.path.basename(os.path.dirname(path))
+        try:
+            st = os.stat(path)
+        except OSError:
+            failed += 1
+            continue
+        prev = index.get(sid)
+        # Un JSONL ne fait que grandir : taille + mtime identiques = rien de nouveau à écrire.
+        if prev and prev.get("size") == st.st_size and prev.get("mtime") == int(st.st_mtime):
+            unchanged += 1
+            continue
+        out_dir = os.path.join(dest_root, proj_dir)
+        os.makedirs(out_dir, exist_ok=True)
+        out = os.path.join(out_dir, sid + ".jsonl.gz")
+        tmp = out + ".part"     # écriture atomique : une interruption ne laisse pas d'archive tronquée
+        try:
+            with open(path, "rb") as src, gzip.open(tmp, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            os.replace(tmp, out)
+        except OSError:
+            failed += 1
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+            continue
+        raw_bytes += st.st_size
+        gz_bytes += os.path.getsize(out)
+        index[sid] = {
+            "project": proj_dir,
+            "size": st.st_size,
+            "mtime": int(st.st_mtime),
+            "archived": datetime.datetime.now().isoformat(timespec="seconds"),
+        }
+        if prev:
+            refreshed += 1
+        else:
+            added += 1
+
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(index, f, indent=2, sort_keys=True)
+
+    total = sum(os.path.getsize(os.path.join(r, n))
+                for r, _, ns in os.walk(dest_root) for n in ns)
+    print(f"\n  ✓ Archive : {dest_root}")
+    print(f"  {added} nouvelles, {refreshed} mises à jour, {unchanged} inchangées"
+          + (f", {failed} en échec" if failed else ""))
+    if raw_bytes:
+        print(f"  {raw_bytes/1048576:.1f} Mo lus → {gz_bytes/1048576:.1f} Mo écrits "
+              f"({raw_bytes/gz_bytes:.1f}x)")
+    print(f"  {len(index)} sessions archivées, {total/1048576:.1f} Mo au total\n")
+    return index
+
+
+def load_archive_index(dest_root=None):
+    """Index de l'archive : {sid: {project, size, mtime, archived}}."""
+    path = os.path.join(dest_root or ARCHIVE_DIR, "index.json")
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def session_cwd(path):
+    """Dossier de travail d'une session : lu dans le transcript, jamais déduit du nom de dossier."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if '"cwd"' not in line:
+                    continue
+                try:
+                    o = json.loads(line)
+                except Exception:
+                    continue
+                if o.get("cwd"):
+                    return o["cwd"]
+    except OSError:
+        pass
+    return ""
+
+
+def restore_session(prefix, dest_root=None, force=False):
+    """Décompresse une session archivée vers ~/.claude/projects pour rendre `claude --resume` possible."""
+    index = load_archive_index(dest_root)
+    if not index:
+        print("  Aucune archive trouvée. Lance d'abord : memorium archive")
+        return 1
+
+    hits = [sid for sid in index if sid.startswith(prefix)]
+    if not hits:
+        print("  Aucune session archivée ne commence par %r (%d en archive)." % (prefix, len(index)))
+        return 1
+    if len(hits) > 1:
+        print("  %d sessions commencent par %r — précise davantage :" % (len(hits), prefix))
+        for sid in sorted(hits)[:10]:
+            print("    %s  (%s)" % (sid, index[sid]["project"]))
+        return 1
+
+    sid = hits[0]
+    meta = index[sid]
+    src = os.path.join(dest_root or ARCHIVE_DIR, meta["project"], sid + ".jsonl.gz")
+    if not os.path.isfile(src):
+        print("  Archive manquante sur le disque : " + src)
+        return 1
+
+    out_dir = os.path.join(PROJECTS_DIR, meta["project"])
+    dest = os.path.join(out_dir, sid + ".jsonl")
+    # Une session vivante peut être plus récente que l'archive : ne jamais l'écraser en silence.
+    if os.path.exists(dest) and not force:
+        local = os.path.getsize(dest)
+        print("")
+        if local == meta["size"]:
+            # Même taille = la session locale EST l'archive : parler d'écrasement n'aurait aucun sens.
+            print("  Cette session est toujours en place, identique à l'archive.")
+            print("  " + dest)
+            print("  Rien à restaurer — tu peux la reprendre directement :")
+            cwd = session_cwd(dest)
+            if cwd:
+                print('    cd "%s"' % cwd)
+            print("    claude --resume " + sid)
+            print("")
+            return 0
+        print("  Une session porte déjà cet identifiant, et elle diffère de l'archive :")
+        print("  " + dest)
+        print("  locale : %d octets | archive : %d octets" % (local, meta["size"]))
+        print("  La version locale est probablement plus récente. Rien n'a été touché.")
+        print("  Pour la remplacer par l'archive : memorium restore <id> --force")
+        print("")
+        return 1
+
+    os.makedirs(out_dir, exist_ok=True)
+    tmp = dest + ".part"
+    try:
+        with gzip.open(src, "rb") as g, open(tmp, "wb") as out:
+            shutil.copyfileobj(g, out)
+        os.replace(tmp, dest)
+    except OSError as e:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        print("  Restauration impossible : %s" % e)
+        return 1
+
+    cwd = session_cwd(dest)
+    print("")
+    print("  ✓ Restaurée : " + dest)
+    print("  %d octets, archivée le %s" % (os.path.getsize(dest), meta.get("archived", "?")))
+    print("")
+    print("  Pour reprendre la conversation :")
+    if cwd:
+        print('    cd "%s"' % cwd)
+    print("    claude --resume " + sid)
+    print("")
+    return 0
+
+
+# ─────────────────────────── Installation (settings Claude Code) ───────────────────────────
+
+SETTINGS_PATH = os.environ.get("MEMORIUM_SETTINGS") or os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
+RETENTION_DAYS = 3650
+
+
+def archive_command():
+    """Commande lancée par le hook : interpréteur et script en absolu, sans dépendre du PATH."""
+    return '"%s" "%s" archive' % (sys.executable, os.path.abspath(__file__))
+
+
+def init_settings(settings_path=None, assume_yes=False):
+    """Relève la rétention et installe le hook SessionEnd, après avoir montré ce qui sera écrit."""
+    path = settings_path or SETTINGS_PATH
+    data = {}
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            print("  %s est illisible (JSON invalide). Rien n'a été touché." % path)
+            return 1
+
+    changes = []
+    current = data.get("cleanupPeriodDays")
+    # On relève, jamais on abaisse : une rétention plus longue que la nôtre est un choix de l'utilisateur.
+    raise_retention = not isinstance(current, int) or current < RETENTION_DAYS
+    if raise_retention:
+        changes.append(("cleanupPeriodDays", repr(current), str(RETENTION_DAYS)))
+
+    cmd = archive_command()
+    hooks = data.get("hooks") or {}
+    session_end = hooks.get("SessionEnd") or []
+    already = any("memorium" in h.get("command", "").lower() or "export.py" in h.get("command", "")
+                  for group in session_end for h in (group.get("hooks") or []))
+    if not already:
+        changes.append(("hooks.SessionEnd", "(aucun hook Memorium)", cmd))
+
+    if not changes:
+        print("")
+        print("  Rien à faire : la rétention est déjà suffisante et le hook est installé.")
+        print("")
+        return 0
+
+    print("")
+    print("  Memorium va modifier ta configuration Claude Code :")
+    print("    " + path)
+    print("")
+    for key, before, after in changes:
+        print("    " + key)
+        print("      avant : " + before)
+        print("      après : " + after)
+    print("")
+    print("  Effet : tes sessions ne seront plus supprimées au bout de 30 jours,")
+    print("  et chaque fin de session déclenchera une sauvegarde automatique.")
+    print("  Une copie de sauvegarde du fichier actuel sera écrite à côté (.bak).")
+    print("")
+
+    if not assume_yes:
+        try:
+            answer = input("  Appliquer ces changements ? [o/N] ").strip().lower()
+        except EOFError:
+            answer = ""
+        if answer not in ("o", "oui", "y", "yes"):
+            print("  Annulé. Aucun fichier modifié.")
+            return 1
+
+    backed_up = False
+    if os.path.isfile(path):
+        try:
+            shutil.copy2(path, path + ".bak")
+            backed_up = True
+        except OSError as e:
+            print("  Sauvegarde impossible (%s) — on s'arrête là, ta config reste intacte." % e)
+            return 1
+
+    if raise_retention:
+        data["cleanupPeriodDays"] = RETENTION_DAYS
+    if not already:
+        session_end.append({"matcher": "", "hooks": [{"type": "command", "command": cmd, "timeout": 30}]})
+        hooks["SessionEnd"] = session_end
+        data["hooks"] = hooks
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".part"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, path)
+    except OSError as e:
+        print("  Écriture impossible : %s" % e)
+        return 1
+
+    print("")
+    print("  ✓ Configuration mise à jour (%s)" % path)
+    if backed_up:
+        print("  ✓ Sauvegarde : %s.bak" % path)
+    print("  Les sessions seront archivées automatiquement à partir de la prochaine.")
+    print("")
+    return 0
+
+
 def main():
     # Console Windows = cp1252 par défaut : force UTF-8 pour les caractères accentués / symboles.
     for stream in (sys.stdout, sys.stderr, sys.stdin):
@@ -2320,6 +2613,19 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
+
+    argv = sys.argv[1:]
+    if "archive" in argv:
+        archive_sessions()
+        return
+    if "restore" in argv:
+        rest = [a for a in argv if a not in ("restore", "--force")]
+        if not rest:
+            print("  Usage : memorium restore <id ou début d'id> [--force]")
+            sys.exit(1)
+        sys.exit(restore_session(rest[0], force="--force" in argv))
+    if "init" in argv:
+        sys.exit(init_settings(assume_yes="--yes" in argv))
 
     # Arguments : "serve" (sert sur localhost) et/ou un dossier de sortie
     serve_mode = "serve" in sys.argv[1:]
