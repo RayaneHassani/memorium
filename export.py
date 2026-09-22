@@ -5,7 +5,7 @@ Memorium — the memory of your Claude Code sessions, as a standalone static HTM
 
 - Reads the JSONL files in ~/.claude/projects (override with MEMORIUM_PROJECTS_DIR).
 - Writes index.html (dashboard, WebGL hero, full-text search) + sessions/*.js + searchindex.js.
-- Highlights, annotations, editable notebook; logical folder and session organisation
+- Highlights, annotations; logical folder and session organisation
   through data/metadata.json — the JSONL source is NEVER modified.
 - Zero dependencies: stdlib only. Offline-first output, no network call.
 
@@ -654,38 +654,6 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .pcard .pnotes{position:absolute;top:14px;right:14px;background:var(--accent2);color:var(--white);font-size:var(--fs-1);
     border-radius:var(--r-pill);padding:2px 9px;font-weight:700;}
 
-  /* ───── Editable notebook ───── */
-  .nb-layout{display:flex;height:calc(100vh - var(--nav-h));}
-  .nb-source{flex:0 0 380px;max-width:44%;overflow-y:auto;padding:20px 18px 60px;border-right:1px solid var(--line);background:var(--panel);}
-  .nb-src-hint{font-size:var(--fs-2);color:var(--muted);font-style:italic;line-height:1.5;padding:2px 2px 10px;border-bottom:1px dashed var(--line);margin-bottom:6px;}
-  .nb-editor{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--paper);}
-  .nb-etop{display:flex;align-items:center;gap:12px;padding:16px 26px 12px;border-bottom:1px solid var(--line);}
-  .nb-etop select{font:inherit;font-size:var(--fs-4);font-weight:700;max-width:280px;padding:4px 8px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--white);color:var(--ink);}
-  .nb-etop button{font-size:var(--fs-2);padding:4px 10px;}
-  .nb-status{margin-left:auto;font-size:var(--fs-2);color:var(--muted);}
-  .nb-status.ok{color:var(--accent2);} .nb-status.err{color:var(--accent-d);}
-  .nb-toolbar{display:flex;align-items:center;gap:4px;padding:8px 26px;border-bottom:1px solid var(--line);}
-  .nb-toolbar button{width:26px;height:26px;padding:0;font-size:var(--fs-2);}
-  .nb-toolbar select{margin-left:8px;font:inherit;font-size:var(--fs-2);padding:3px 6px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--white);color:var(--ink);}
-  .nb-blocks{flex:1;overflow-y:auto;padding:20px 34px 120px;color:var(--ink);font-family:var(--mono);font-size:var(--fs-4);line-height:1.7;}
-  .blk strong{font-weight:700;}
-  .blk em{font-style:italic;}
-  .blk code{font-size:.92em;background:var(--code-bg);padding:.05em .3em;border-radius:var(--r-1);}
-  .blk s{text-decoration:line-through;opacity:.75;}
-  .blk a{color:var(--accent-d);text-decoration:underline;text-underline-offset:2px;}
-  .blk{margin:2px 0;padding:2px 4px;outline:none;white-space:pre-wrap;word-break:break-word;border-radius:var(--r-1);}
-  .blk-h1{font-size:var(--fs-7);font-weight:800;line-height:1.25;margin:22px 0 6px;letter-spacing:-.01em;}
-  .blk-h2{font-size:var(--fs-6);font-weight:800;line-height:1.3;margin:18px 0 4px;}
-  .blk-h3{font-size:var(--fs-5);font-weight:700;margin:14px 0 2px;}
-  .blk[data-ph]:empty:focus::before,.nb-blocks > .blk-p:only-child:empty::before{content:attr(data-ph);color:var(--muted);opacity:.6;pointer-events:none;}
-  .blk-code,.blk-raw{padding:0;margin:8px 0;}
-  .blk-ta{display:block;width:100%;resize:none;overflow:hidden;outline:none;padding:10px 13px;border-radius:var(--r-2);
-    font:var(--fs-3)/1.5 var(--mono);background:var(--term-bg);color:var(--term-ink);border:1px solid var(--term-edge);}
-  .blk-raw .blk-ta{background:var(--panel);color:var(--ink);border:1px dashed var(--line);}
-  .blk-hr{padding:10px 4px;}
-  .blk-hr hr{border:none;border-top:1px solid var(--line);margin:0;}
-  .blk-hr:focus hr{border-top-color:var(--accent);}
-
   /* ───── Organize ───── */
   .ed-wrap{max-width:880px;margin:0 auto;padding:34px 24px 110px;}
   .ed-head h1{font-size:var(--fs-7);margin:0 0 8px;font-weight:800;letter-spacing:-.01em;}
@@ -1028,7 +996,6 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   <div class="nav-brand" id="navHome"><svg class="brand-svg" viewBox="0 0 48 24" fill="none" aria-hidden="true"><path d="M3 12 C9 5.5, 15 18.5, 22 12 C29 5.5, 34 16.5, 40 12" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round"/><path d="M40 8.5 L45 12 L40 15.5" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 8.5 V6" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="11" cy="4.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/><path d="M30 14.5 V17.5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/><circle cx="30" cy="19.4" r="2.7" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="1.5"/></svg>Memorium</div>
   <div class="nav-tabs">
     <button data-view="dash" class="active">Dashboard</button>
-    <button data-view="notebook">Notebook</button>
     <button data-view="organize">Organize</button>
     <button data-view="manual">Manual</button>
   </div>
@@ -1073,33 +1040,6 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
       </div>
       <div id="viewer"></div>
     </main>
-  </div>
-</section>
-
-<section id="view-notebook" class="view">
-  <div class="nb-layout">
-    <div class="nb-source" id="nb-source"></div>
-    <div class="nb-editor">
-      <div class="nb-etop">
-        <select id="nb-select" aria-label="Note"></select>
-        <button id="nb-new">New</button><button id="nb-ren">Rename</button><button id="nb-del">Delete</button>
-        <span class="nb-status" id="nb-status"></span>
-      </div>
-      <div class="nb-toolbar" id="nb-toolbar">
-        <button data-mark="strong" title="Bold (Ctrl+B)"><b>B</b></button>
-        <button data-mark="em" title="Italic (Ctrl+I)"><i>I</i></button>
-        <button data-mark="s" title="Strikethrough"><s>S</s></button>
-        <button data-mark="code" title="Code">&lt;/&gt;</button>
-        <button data-mark="link" title="Link (Ctrl+K)">Link</button>
-        <select id="nb-blocktype" title="Block type">
-          <option value="p">Text</option>
-          <option value="h1">Heading 1</option>
-          <option value="h2">Heading 2</option>
-          <option value="h3">Heading 3</option>
-        </select>
-      </div>
-      <div id="nb-blocks" class="nb-blocks"></div>
-    </div>
   </div>
 </section>
 
@@ -1161,7 +1101,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   <div class="bash"><div class="term-cmd"><span class="ps">$</span>memorium</div></div>
 
   <h3>memorium serve</h3>
-  <p>Same build, then serves it on <code>http://localhost:8137</code>. Required for editing: renaming, moving sessions and the notebook all write to disk through the File System Access API, which browsers disable on <code>file://</code> pages. Reading works fine either way.</p>
+  <p>Same build, then serves it on <code>http://localhost:8137</code>. Required for editing: renaming and moving sessions write to disk through the File System Access API, which browsers disable on <code>file://</code> pages. Reading works fine either way.</p>
   <div class="bash"><div class="term-cmd"><span class="ps">$</span>memorium serve</div></div>
 
   <h2>What Memorium never does</h2>
@@ -1207,7 +1147,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <script>
 const MANIFEST = __MANIFEST__;
 const cache = {};
-let curSid=null, anns=[], pendingSid=null, curView="dash", afterMountAid=null, curProject=null;
+let curSid=null, anns=[], pendingSid=null, curView="dash", curProject=null;
 let META={folders:{},sessions:{}};   // overrides loaded from data/metadata.json (derived layer, never the source)
 const viewer=document.getElementById("viewer");
 const emptyread=document.getElementById("emptyread");
@@ -1274,7 +1214,6 @@ async function initStore(){                      // load metadata.json into META
   try{const j=JSON.parse(meta); META={folders:j.folders||{},sessions:j.sessions||{}};}
   catch(e){console.warn("metadata.json unreadable, ignored",e);}
   buildDashboard();
-  if(curView==="notebook") buildNotebook();
   if(curView==="read") buildSidebar("");
   if(curSid) document.querySelectorAll(".sess").forEach(e=>e.classList.toggle("active",e.dataset.sid===curSid));
   console.log("[memorium] store OK —",Object.keys(META.folders).length,"folders,",Object.keys(META.sessions).length,"sessions modified");
@@ -1289,8 +1228,6 @@ function updateDirPill(){
 
 /* ───── Navigation entre vues ───── */
 function setView(v){
-  const prev=curView;
-  if(prev==="notebook"&&v!=="notebook")nbFlush();
   curView=v;
   document.body.classList.toggle("welcome",v==="welcome");
   if(window.__heroSetActive)window.__heroSetActive(v==="welcome");
@@ -1301,7 +1238,6 @@ function setView(v){
   document.getElementById("pager").style.display = reading?"flex":"none";
   if(v!=="read"){document.getElementById("recap").classList.remove("open");hideBar();closeNote();}
   if(v==="dash")buildDashboard();
-  if(v==="notebook")buildNotebook();
   if(v==="organize")buildOrganize();
   window.scrollTo({top:0});
 }
@@ -1336,521 +1272,6 @@ function openProject(proj){
   buildSidebar("");
   const sess=(projectGroups()[proj]||[]).slice().sort((a,b)=>b.mtime-a.mtime);
   if(sess.length)openSession(sess[0].sid);
-}
-
-/* ───── Editable notebook: left = draggable source, right = editor → notebook.md ───── */
-let nbTimer=null, nbLoaded=false, nbNotes=[], nbCur=null;
-function nbSnippetAnn(m,a){                       // annotation → citation + lien retour
-  let s="\n> « "+(a.quote||"").trim()+" »\n";
-  if(a.note)s+=a.note.trim()+"\n";
-  s+="— ["+effTitle(m)+"](session:"+m.sid+"#"+a.id+")\n";
-  return s;
-}
-function nbSnippetSess(m){ return "\n— ["+effTitle(m)+"](session:"+m.sid+")\n"; }
-function nbStatus(state){
-  const el=document.getElementById("nb-status"); if(!el)return;
-  el.className="nb-status"+(state==="saved"?" ok":state==="error"?" err":"");
-  el.textContent=state==="saving"?"✎ saving…":state==="saved"?"✓ saved":state==="error"?"✗ write failed":"";
-}
-function nbSchedule(){ clearTimeout(nbTimer); nbStatus("saving"); nbTimer=setTimeout(nbFlush,600); }
-async function nbFlush(){                         // writes the open note; called on debounce AND on view change
-  clearTimeout(nbTimer); nbTimer=null;
-  if(!document.getElementById("nb-blocks")||!rootDir||nbCur===null)return;
-  const name=nbCur, text=nbSerialize();
-  try{await nbWrite(name,text); nbStatus("saved");}
-  catch(e){nbStatus("error");}
-}
-/* notes live in data/notes/<title>.md: the file name is the title, no extra index to keep in sync */
-async function notesDir(create){
-  const d=await dataDir(); if(!d)return null;
-  try{return await d.getDirectoryHandle("notes",{create:!!create});}catch(e){return null;}
-}
-async function nbList(){
-  const d=await notesDir(); const out=[]; if(!d)return out;
-  for await(const [n,h] of d.entries()) if(h.kind==="file"&&n.endsWith(".md")) out.push(n.slice(0,-3));
-  return out.sort((a,b)=>a.localeCompare(b));
-}
-async function nbRead(name){
-  const d=await notesDir(); if(!d)return "";
-  try{return await (await (await d.getFileHandle(name+".md")).getFile()).text();}catch(e){return "";}
-}
-async function nbWrite(name,text){
-  const d=await notesDir(true);
-  const w=await (await d.getFileHandle(name+".md",{create:true})).createWritable();
-  await w.write(text); await w.close();
-}
-async function nbRemove(name){ const d=await notesDir(); if(d)await d.removeEntry(name+".md"); }
-function nbSafe(v){ return (v||"").replace(/[\\/:*?"<>|]/g,"").trim().slice(0,80).replace(/[. ]+$/,""); }
-function nbUnique(base){
-  let n=base, i=2; while(nbNotes.includes(n))n=base+" "+i++;
-  return n;
-}
-/* ───── Notebook editor: one block per paragraph/heading/code/separator ───── */
-/* Source of truth = the DOM; nbSerialize() walks it, nbParse() rebuilds it. Anything the parser
-   does not understand (lists, quotes, tables, html…) is kept verbatim in a "raw" block. */
-/* Source of truth = the DOM; nbSerialize() walks it, nbParse() rebuilds it. Anything the parser
-   does not understand (lists, quotes, tables, html…) is kept verbatim in a "raw" block. Inline
-   marks (bold/italic/code/strike/link) live as real DOM elements inside text blocks; no escaping
-   syntax in v1 — a literal "**" always reads as bold, documented trade-off. */
-const NB_HEAD={h1:1,h2:2,h3:3};
-const NB_RAW=/^(\s{0,3}(>|[-*+]\s|\d+[.)]\s|\||<|!\[|\[[^\]]+\]:)|\t| {4})/;
-const NB_HR=/^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
-const NB_INLINE_RE=/\*\*([^*\n]+)\*\*|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|\[([^\]\n]+)\]\(([^)\n]+)\)/g;
-function nbParse(md){
-  const lines=md.replace(/\r\n?/g,"\n").split("\n"), out=[]; let buf=[];
-  const flush=()=>{
-    if(!buf.length)return;
-    if(buf.length===1&&NB_HR.test(buf[0]))out.push({t:"hr",text:""});
-    else if(buf.some(l=>NB_RAW.test(l)||NB_HR.test(l)))out.push({t:"raw",text:buf.join("\n")});
-    else out.push({t:"p",text:buf.map(l=>l.replace(/ {2,}$/,"")).join("\n").trim()});
-    buf=[];
-  };
-  for(let i=0;i<lines.length;i++){
-    const l=lines[i], f=l.match(/^\s{0,3}(`{3,}|~{3,})\s*([^`\s]*)/);
-    if(f){
-      flush(); const body=[], close=new RegExp("^\\s{0,3}"+f[1][0]+"{"+f[1].length+",}\\s*$"); i++;
-      while(i<lines.length&&!close.test(lines[i]))body.push(lines[i++]);
-      out.push({t:"code",text:body.join("\n"),lang:f[2]}); continue;
-    }
-    const h=l.match(/^(#{1,3}) +(.*)$/);
-    if(h){flush(); out.push({t:"h"+h[1].length,text:h[2].trim()}); continue;}
-    if(!l.trim()){flush(); continue;}
-    buf.push(l);
-  }
-  flush(); return out;
-}
-function nbWalk(root,cb){                          // visits text nodes and <br> in document order
-  root.childNodes.forEach(c=>{
-    if(c.nodeType===3)cb(c,false);
-    else if(c.nodeName==="BR")cb(c,true);
-    else nbWalk(c,cb);
-  });
-}
-function nbTextOf(el){                             // flattened text of a block; <br> is a soft line break
-  let s="", last="";
-  nbWalk(el,(n,isBR)=>{ if(isBR){s+="\n"; last="br";} else {s+=n.nodeValue; last="t";} });
-  return last==="br"?s.slice(0,-1):s;               // a trailing <br> is only the caret placeholder
-}
-function nbPointAt(root,pos){                       // DOM {node,offset} for a character offset in root's flattened text
-  let left=pos, found=null;
-  nbWalk(root,(n,isBR)=>{
-    if(found)return;
-    if(isBR){ if(left===0){found={node:n.parentNode,offset:Array.prototype.indexOf.call(n.parentNode.childNodes,n)};} else left--; }
-    else{ if(left<=n.nodeValue.length)found={node:n,offset:left}; else left-=n.nodeValue.length; }
-  });
-  return found||{node:root,offset:root.childNodes.length};
-}
-function nbInlineParse(text){                       // markdown line -> fragment of text + <strong>/<em>/<code>/<s>/<a>
-  const frag=document.createDocumentFragment();
-  let last=0, m; NB_INLINE_RE.lastIndex=0;
-  while((m=NB_INLINE_RE.exec(text))){
-    if(m.index>last)frag.appendChild(document.createTextNode(text.slice(last,m.index)));
-    let el;
-    if(m[1]!==undefined){el=document.createElement("strong"); el.textContent=m[1];}
-    else if(m[2]!==undefined){el=document.createElement("s"); el.textContent=m[2];}
-    else if(m[3]!==undefined){el=document.createElement("code"); el.textContent=m[3];}
-    else if(m[4]!==undefined){el=document.createElement("em"); el.textContent=m[4];}
-    else{el=document.createElement("a"); el.href=m[6]; el.target="_blank"; el.rel="noopener"; el.textContent=m[5];}
-    frag.appendChild(el); last=NB_INLINE_RE.lastIndex;
-  }
-  if(last<text.length)frag.appendChild(document.createTextNode(text.slice(last)));
-  return frag;
-}
-function nbSetInline(el,text){                      // fills a text block from raw markdown, parsing inline marks
-  el.textContent="";
-  text.split("\n").forEach((l,i)=>{ if(i)el.appendChild(document.createElement("br")); el.appendChild(nbInlineParse(l)); });
-}
-function nbInlineSerialize(el){                     // DOM back to markdown text, dropping the zero-width caret marker
-  let out="";
-  el.childNodes.forEach(c=>{
-    if(c.nodeType===3)out+=c.nodeValue.replace(/​/g,"");
-    else if(c.nodeName==="BR")out+="\n";
-    else if(c.nodeName==="STRONG")out+="**"+nbInlineSerialize(c)+"**";
-    else if(c.nodeName==="EM")out+="*"+nbInlineSerialize(c)+"*";
-    else if(c.nodeName==="CODE")out+="`"+c.textContent+"`";
-    else if(c.nodeName==="S")out+="~~"+nbInlineSerialize(c)+"~~";
-    else if(c.nodeName==="A")out+="["+nbInlineSerialize(c)+"]("+(c.getAttribute("href")||"")+")";
-    else out+=nbInlineSerialize(c);
-  });
-  return out;
-}
-function nbSerialize(){
-  const parts=[];
-  document.querySelectorAll("#nb-blocks > .blk").forEach(b=>{
-    const t=b.dataset.t;
-    if(t==="hr"){parts.push("---"); return;}
-    if(t==="code"||t==="raw"){
-      const v=b.querySelector("textarea").value;
-      if(t==="raw"){ if(v.trim())parts.push(v.replace(/\s+$/,"")); return; }
-      let run=0; (v.match(/`+/g)||[]).forEach(m=>{run=Math.max(run,m.length);});
-      const fence="`".repeat(Math.max(3,run+1));
-      parts.push(fence+(b.dataset.lang||"")+"\n"+v+"\n"+fence); return;
-    }
-    const x=nbInlineSerialize(b).replace(/\s+$/,"");
-    if(!x)return;                                   // empty paragraphs are editor scaffolding, not content
-    parts.push(NB_HEAD[t]?"#".repeat(NB_HEAD[t])+" "+x.replace(/\n/g," "):x.replace(/\n/g,"  \n"));
-  });
-  return parts.length?parts.join("\n\n")+"\n":"";
-}
-function nbBlock(t,text,lang){
-  const b=document.createElement("div"); b.className="blk blk-"+t; b.dataset.t=t;
-  if(t==="code"||t==="raw"){
-    if(lang)b.dataset.lang=lang;
-    const ta=document.createElement("textarea"); ta.className="blk-ta"; ta.spellcheck=false; ta.rows=1; ta.value=text||"";
-    b.appendChild(ta);
-  }else if(t==="hr"){ b.tabIndex=0; b.appendChild(document.createElement("hr")); }
-  else{ b.contentEditable="true"; b.dataset.ph=t==="p"?"Write here, or drag an annotation from the left.":"Heading"; nbSetInline(b,text||""); }
-  return b;
-}
-function nbGrow(ta){ ta.style.height="auto"; ta.style.height=ta.scrollHeight+"px"; }
-function nbInsertBlocks(ref,arr){                   // inserts after ref, returns the last inserted block
-  let at=ref;
-  arr.forEach(x=>{
-    const n=nbBlock(x.t,x.text,x.lang); at.parentNode.insertBefore(n,at.nextSibling);
-    const ta=n.querySelector("textarea"); if(ta)nbGrow(ta);
-    at=n;
-  });
-  return at;
-}
-function nbEnsureTail(){                            // the last block is always a paragraph, so there is a place to type
-  const box=document.getElementById("nb-blocks"), last=box.lastElementChild;
-  if(!last||last.dataset.t!=="p")box.appendChild(nbBlock("p",""));
-}
-function nbLoad(md){
-  const box=document.getElementById("nb-blocks"); box.innerHTML="";
-  const arr=nbParse(md); if(!arr.length)arr.push({t:"p",text:""});
-  arr.forEach(x=>box.appendChild(nbBlock(x.t,x.text,x.lang)));
-  nbEnsureTail();
-  box.querySelectorAll("textarea").forEach(nbGrow);
-}
-function nbFocus(b,atEnd){
-  const ta=b.querySelector("textarea");
-  if(ta){ ta.focus(); const n=atEnd?ta.value.length:0; ta.setSelectionRange(n,n); return; }
-  b.focus();
-  if(b.isContentEditable){
-    const r=document.createRange(); r.selectNodeContents(b); r.collapse(!atEnd);
-    const s=getSelection(); s.removeAllRanges(); s.addRange(r);
-  }
-}
-function nbSetCaret(b,off){
-  const p=nbPointAt(b,off), r=document.createRange();
-  r.setStart(p.node,p.offset); r.collapse(true);
-  const s=getSelection(); s.removeAllRanges(); s.addRange(r);
-}
-function nbCaret(b){                                // text before / after the caret, null if the caret is elsewhere
-  const s=getSelection(); if(!s.rangeCount)return null;
-  const r=s.getRangeAt(0); if(!b.contains(r.startContainer))return null;
-  const pre=document.createRange(); pre.selectNodeContents(b); pre.setEnd(r.startContainer,r.startOffset);
-  const post=document.createRange(); post.selectNodeContents(b); post.setStart(r.endContainer,r.endOffset);
-  return {before:nbTextOf(pre.cloneContents()), after:nbTextOf(post.cloneContents())};
-}
-function nbAtEdge(b,up){                            // is the caret on the first (up) or last visual line?
-  const s=getSelection(); if(!s.rangeCount||!s.isCollapsed)return false;
-  const cr=s.getRangeAt(0).getClientRects()[0];
-  const e=document.createRange(); e.selectNodeContents(b); e.collapse(up);
-  const er=e.getClientRects()[0];
-  if(!cr||!er)return true;                          // empty block: no geometry, it is both first and last line
-  return Math.abs(cr.top-er.top)<2;
-}
-function nbRemoveBlock(b){
-  const o=b.previousElementSibling||b.nextElementSibling, wasPrev=!!b.previousElementSibling;
-  b.remove(); nbEnsureTail();
-  const box=document.getElementById("nb-blocks");
-  nbFocus(o&&o.isConnected?o:box.lastElementChild,wasPrev); nbSchedule();
-}
-function nbBack(b){                                 // Backspace at the very start of a text block
-  if(NB_HEAD[b.dataset.t]){ b.dataset.t="p"; b.className="blk blk-p"; b.dataset.ph="Write here, or drag an annotation from the left."; nbSchedule(); return; }
-  const prev=b.previousElementSibling; if(!prev)return;
-  const pt=prev.dataset.t;
-  if(pt==="hr"){ prev.remove(); nbSchedule(); return; }
-  if(pt==="code"||pt==="raw"){ if(!nbTextOf(b))nbRemoveBlock(b); else nbFocus(prev,true); return; }
-  const at=nbTextOf(prev).length;
-  while(b.firstChild)prev.appendChild(b.firstChild);  // move the real nodes so formatting survives the merge
-  b.remove(); nbEnsureTail();
-  prev.focus(); nbSetCaret(prev,at); nbSchedule();
-}
-function nbToggleMark(tag){                         // Bold/Italic/Strike/Code on the current selection
-  const sel=getSelection(); if(!sel.rangeCount||sel.isCollapsed)return;
-  const r=sel.getRangeAt(0);
-  const anchor=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement;
-  const b=anchor.closest(".blk"); if(!b||!(b.dataset.t==="p"||NB_HEAD[b.dataset.t]))return;
-  const mark=anchor.closest(tag);                    // an existing mark anywhere around the selection start: toggle it off
-  if(mark&&b.contains(mark)){
-    const parent=mark.parentNode; while(mark.firstChild)parent.insertBefore(mark.firstChild,mark); parent.removeChild(mark); parent.normalize();
-  }else{
-    const el=document.createElement(tag); el.appendChild(r.extractContents()); r.insertNode(el);
-    const r2=document.createRange(); r2.selectNodeContents(el);
-    sel.removeAllRanges(); sel.addRange(r2);
-  }
-  nbSchedule();
-}
-function nbLink(){
-  const sel=getSelection(); if(!sel.rangeCount||sel.isCollapsed)return;
-  const r=sel.getRangeAt(0);
-  const anchor=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement;
-  const b=anchor.closest(".blk"); if(!b||!(b.dataset.t==="p"||NB_HEAD[b.dataset.t]))return;
-  const url=prompt("Link URL:","https://"); if(!url)return;
-  const a=document.createElement("a"); a.href=url; a.target="_blank"; a.rel="noopener";
-  a.appendChild(r.extractContents()); r.insertNode(a);
-  nbSchedule();
-}
-function nbApplyMark(b,end,matchLen,tag,inner){      // replaces the just-typed markdown delimiters with a real mark
-  const caretPos=nbTextOf((function(){const d=document.createRange();d.selectNodeContents(b);d.setEnd(end.node,end.offset);return d.cloneContents();})()).length;
-  const sp=nbPointAt(b,caretPos-matchLen), ep=nbPointAt(b,caretPos);
-  const r=document.createRange(); r.setStart(sp.node,sp.offset); r.setEnd(ep.node,ep.offset); r.deleteContents();
-  const el=document.createElement(tag); el.textContent=inner; r.insertNode(el);
-  const gap=document.createTextNode("​"); el.parentNode.insertBefore(gap,el.nextSibling);
-  const nr=document.createRange(); nr.setStart(gap,1); nr.collapse(true);
-  const s=getSelection(); s.removeAllRanges(); s.addRange(nr);
-  nbSchedule();
-}
-function nbAutoformat(b){                            // live markdown -> real formatting as you type
-  if(!(b.dataset.t==="p"||NB_HEAD[b.dataset.t]))return;
-  const sel=getSelection(); if(!sel.isCollapsed||!sel.rangeCount)return;
-  const r=sel.getRangeAt(0); if(!b.contains(r.startContainer))return;
-  if(b.dataset.t==="p"){
-    const hm=nbTextOf(b).match(/^(#{1,3}) $/);
-    if(hm){ const n=hm[1].length; b.dataset.t="h"+n; b.className="blk blk-h"+n; b.dataset.ph="Heading"; b.textContent=""; nbSchedule(); return; }
-  }
-  const pre=document.createRange(); pre.selectNodeContents(b); pre.setEnd(r.startContainer,r.startOffset);
-  const before=nbTextOf(pre.cloneContents());
-  let m;
-  if((m=before.match(/\*\*([^*\n\u200b]+)\*\*$/))){nbApplyMark(b,{node:r.startContainer,offset:r.startOffset},m[0].length,"strong",m[1]); return;}
-  if((m=before.match(/~~([^~\n\u200b]+)~~$/))){nbApplyMark(b,{node:r.startContainer,offset:r.startOffset},m[0].length,"s",m[1]); return;}
-  if((m=before.match(/`([^`\n\u200b]+)`$/))){nbApplyMark(b,{node:r.startContainer,offset:r.startOffset},m[0].length,"code",m[1]); return;}
-  if((m=before.match(/(^|[^*])\*([^*\n\u200b]+)\*$/))){const core="*"+m[2]+"*"; nbApplyMark(b,{node:r.startContainer,offset:r.startOffset},core.length,"em",m[2]); return;}
-}
-function nbCodeExit(b){                            // "writing outside the code" always lands in a paragraph
-  const n=b.nextElementSibling;
-  if(n&&n.dataset.t==="p")return n;
-  return nbInsertBlocks(b,[{t:"p",text:""}]);
-}
-function nbKeyArea(e,b){                            // code / raw blocks are plain textareas
-  const ta=e.target; if(ta.tagName!=="TEXTAREA")return;
-  const col=ta.selectionStart===ta.selectionEnd, atEnd=col&&ta.selectionStart===ta.value.length;
-  const firstLine=col&&!ta.value.slice(0,ta.selectionStart).includes("\n");
-  const lastLine=col&&!ta.value.slice(ta.selectionStart).includes("\n");
-  if(e.key==="Enter"&&!e.shiftKey&&b.dataset.t==="code"&&atEnd&&/\n$/.test(ta.value)){   // empty last line + Enter leaves the block
-    e.preventDefault(); ta.value=ta.value.slice(0,-1); nbGrow(ta);
-    const nx=b.nextElementSibling;
-    nbFocus(nx&&nx.dataset.t==="p"?nx:nbInsertBlocks(b,[{t:"p",text:""}]),false); nbSchedule(); return;
-  }
-  if(e.key==="Backspace"&&ta.value===""){e.preventDefault(); nbRemoveBlock(b); return;}
-  if(e.key==="ArrowUp"&&firstLine&&b.previousElementSibling){e.preventDefault(); nbFocus(b.previousElementSibling,true);}
-  if(e.key==="ArrowLeft"&&col&&ta.selectionStart===0&&b.previousElementSibling){e.preventDefault(); nbFocus(b.previousElementSibling,true);}
-  if(e.key==="ArrowDown"&&lastLine){e.preventDefault(); nbFocus(nbCodeExit(b),false);}
-  if(e.key==="ArrowRight"&&col&&ta.selectionStart===ta.value.length){e.preventDefault(); nbFocus(nbCodeExit(b),false);}
-}
-function nbCodeEdge(sel){                          // caret at the very end of an inline <code>: first step out of it, into plain text
-  const n=sel.anchorNode; if(!sel.isCollapsed||!n||n.nodeType!==3)return false;
-  const code=n.parentElement&&n.parentElement.closest("code"); if(!code||n.nextSibling||n.parentElement!==code||sel.anchorOffset!==n.nodeValue.length)return false;
-  let nx=code.nextSibling;
-  if(nx&&nx.nodeType===3&&nx.nodeValue==="")nx=(nx.remove(),code.nextSibling);   // leftover empty text node: the caret would fall back into the code
-  if(!(nx&&nx.nodeType===3&&nx.nodeValue.startsWith("\u200b"))){nx=document.createTextNode("\u200b"); code.parentNode.insertBefore(nx,code.nextSibling);}
-  const r=document.createRange(); r.setStart(nx,1); r.collapse(true);
-  sel.removeAllRanges(); sel.addRange(r); return true;
-}
-function nbKey(e){
-  const b=e.target.closest&&e.target.closest(".blk"); if(!b||e.isComposing)return;
-  const t=b.dataset.t;
-  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(t==="p"||NB_HEAD[t])){
-    const k=e.key.toLowerCase();
-    if(k==="b"){e.preventDefault(); nbToggleMark("strong"); return;}
-    if(k==="i"){e.preventDefault(); nbToggleMark("em"); return;}
-    if(k==="k"){e.preventDefault(); nbLink(); return;}
-  }
-  if(t==="code"||t==="raw"){nbKeyArea(e,b); return;}
-  if(t==="hr"){
-    if(e.key==="Backspace"||e.key==="Delete"){e.preventDefault(); nbRemoveBlock(b);}
-    else if(e.key==="Enter"){e.preventDefault(); nbFocus(nbInsertBlocks(b,[{t:"p",text:""}]),false); nbSchedule();}
-    else if(e.key==="ArrowUp"&&b.previousElementSibling){e.preventDefault(); nbFocus(b.previousElementSibling,true);}
-    else if(e.key==="ArrowDown"&&b.nextElementSibling){e.preventDefault(); nbFocus(b.nextElementSibling,false);}
-    return;
-  }
-  const sel=getSelection();
-  if(e.key==="Enter"){
-    e.preventDefault();
-    if(e.shiftKey){ if(t==="p")document.execCommand("insertLineBreak"); return; }
-    if(!sel.isCollapsed)document.execCommand("delete");
-    if(!sel.rangeCount)return;
-    const r=sel.getRangeAt(0); if(!b.contains(r.startContainer))return;
-    let afterFrag;
-    if(b.lastChild){ const after=document.createRange(); after.setStart(r.startContainer,r.startOffset); after.setEnd(b,b.childNodes.length); afterFrag=after.extractContents(); }
-    else afterFrag=document.createDocumentFragment();
-    const nb=nbBlock("p",""); nb.appendChild(afterFrag);
-    b.parentNode.insertBefore(nb,b.nextSibling);
-    nbFocus(nb,false); nbSchedule(); return;
-  }
-  if(!sel.isCollapsed||e.altKey||e.ctrlKey||e.metaKey)return;
-  if(e.key==="ArrowRight"&&!e.shiftKey&&nbCodeEdge(sel)){e.preventDefault(); return;}
-  const c=nbCaret(b); if(!c)return;
-  if(e.key==="Backspace"&&c.before===""){e.preventDefault(); nbBack(b); return;}
-  const prev=b.previousElementSibling, next=b.nextElementSibling;
-  if(e.key==="ArrowLeft"&&c.before===""&&prev&&!e.shiftKey){e.preventDefault(); nbFocus(prev,true);}
-  else if(e.key==="ArrowRight"&&c.after===""&&next&&!e.shiftKey){e.preventDefault(); nbFocus(next,false);}
-  else if(e.key==="ArrowUp"&&prev&&!e.shiftKey&&nbAtEdge(b,true)){e.preventDefault(); nbFocus(prev,true);}
-  else if(e.key==="ArrowDown"&&next&&!e.shiftKey&&nbAtEdge(b,false)){e.preventDefault(); nbFocus(next,false);}
-}
-function nbPaste(e){                                // plain text only; multi-line text is parsed into blocks
-  const b=e.target.closest&&e.target.closest(".blk"); if(!b||e.target.tagName==="TEXTAREA")return;
-  e.preventDefault();
-  const txt=(e.clipboardData.getData("text/plain")||"").replace(/\r\n?/g,"\n"); if(!txt)return;
-  if(!txt.trim().includes("\n")){document.execCommand("insertText",false,txt.trim()); return;}
-  let rest=nbParse(txt); if(!rest.length)return;
-  if(rest[0].t==="p"){document.execCommand("insertText",false,rest[0].text.replace(/\n/g," ")); rest=rest.slice(1);}
-  if(rest.length){
-    const last=nbInsertBlocks(b,rest);
-    if(b.dataset.t==="p"&&!nbTextOf(b))b.remove();
-    nbFocus(last,true);
-  }
-  nbEnsureTail(); nbSchedule();
-}
-function nbDrop(e){                                 // annotations / sessions dragged from the source panel, or any text
-  e.preventDefault();
-  const txt=e.dataTransfer.getData("text/plain"); if(!txt)return;
-  const box=document.getElementById("nb-blocks"), t=e.target.closest&&e.target.closest(".blk");
-  const arr=nbParse(txt); if(!arr.length)return;
-  nbFocus(nbInsertBlocks(t||box.lastElementChild,arr),true);
-  nbEnsureTail(); nbSchedule();
-}
-let nbActiveBlock=null;
-function nbToolbar(){
-  const bar=document.getElementById("nb-toolbar"); if(!bar||bar.dataset.wired)return; bar.dataset.wired="1";
-  bar.querySelectorAll("button[data-mark]").forEach(btn=>{
-    btn.onmousedown=e=>e.preventDefault();          // keep the text selection alive through the click
-    btn.onclick=()=>{const m=btn.dataset.mark; if(m==="link")nbLink(); else nbToggleMark(m);};
-  });
-  const sel=document.getElementById("nb-blocktype");
-  sel.onchange=()=>{
-    const b=nbActiveBlock; if(!b||!b.isConnected)return;
-    const v=sel.value;
-    if(v==="p"){ b.dataset.t="p"; b.className="blk blk-p"; b.dataset.ph="Write here, or drag an annotation from the left."; }
-    else{ const n=NB_HEAD[v]; b.dataset.t=v; b.className="blk blk-"+v; b.dataset.ph="Heading"; }
-    nbFocus(b,true); nbSchedule();
-  };
-}
-function nbWire(){                                  // listeners are delegated on the container, attached once
-  const box=document.getElementById("nb-blocks"); if(box.dataset.wired)return; box.dataset.wired="1";
-  box.addEventListener("keydown",nbKey);
-  box.addEventListener("paste",nbPaste);
-  box.addEventListener("dragover",e=>e.preventDefault());
-  box.addEventListener("drop",nbDrop);
-  box.addEventListener("focusin",e=>{const b=e.target.closest(".blk"); if(b){nbActiveBlock=b; const s=document.getElementById("nb-blocktype"); if(s)s.value=NB_HEAD[b.dataset.t]?b.dataset.t:"p";}});
-  box.addEventListener("input",e=>{
-    const b=e.target.closest(".blk"); if(!b)return;
-    if(e.target.tagName==="TEXTAREA"){nbGrow(e.target); nbSchedule(); return;}
-    if(b.isContentEditable&&nbTextOf(b)==="")b.textContent="";   // drop the leftover <br> so the placeholder shows
-    nbAutoformat(b); nbSchedule();
-  });
-  box.addEventListener("click",e=>{ if(e.target===box&&getSelection().isCollapsed){nbEnsureTail(); nbFocus(box.lastElementChild,true);} });
-  nbToolbar();
-  nbLoad("");
-}
-function nbBar(){
-  const sel=document.getElementById("nb-select"); if(!sel)return;
-  sel.innerHTML=""; nbNotes.forEach(n=>{const o=document.createElement("option");o.value=n;o.textContent=n;sel.appendChild(o);});
-  if(nbCur!==null)sel.value=nbCur;
-  const on=!!rootDir;
-  ["nb-select","nb-new","nb-ren","nb-del"].forEach(id=>document.getElementById(id).disabled=!on);
-}
-async function nbOpen(name){
-  await nbFlush();
-  nbLoad(await nbRead(name));
-  nbCur=name; nbBar();
-  try{localStorage.setItem("memorium-note",name);}catch(e){}
-}
-async function nbInit(){
-  nbLoaded=true;
-  // First run only: the former single notebook (or the legacy carnet.md) becomes the first note.
-  // Keyed on the notes folder not existing yet, so deleting every note later never resurrects it.
-  const first=(await notesDir(false))===null;
-  if(first){
-    let t=await readData("notebook.md"); if(t===null)t=await readData("carnet.md");
-    await nbWrite("Notebook",t||"");
-  }
-  nbNotes=await nbList();
-  if(!nbNotes.length){await nbWrite("Untitled",""); nbNotes=["Untitled"];}
-  let last=null; try{last=localStorage.getItem("memorium-note");}catch(e){}
-  await nbOpen(nbNotes.includes(last)?last:nbNotes[0]);
-}
-async function nbNew(){
-  const v=prompt("Note title:","Untitled"); if(v===null)return; const t=nbSafe(v); if(!t)return;
-  const name=nbUnique(t); await nbFlush(); await nbWrite(name,"");
-  nbNotes=await nbList(); await nbOpen(name);
-}
-async function nbRename(){
-  const v=prompt("Rename note:",nbCur); if(v===null)return; const t=nbSafe(v);
-  if(!t||t===nbCur)return;
-  if(nbNotes.includes(t)){alert("A note with that name already exists.");return;}
-  await nbFlush();
-  await nbWrite(t,nbSerialize()); await nbRemove(nbCur);
-  nbNotes=await nbList(); nbCur=t; nbBar();
-  try{localStorage.setItem("memorium-note",t);}catch(e){}
-}
-async function nbDelete(){
-  if(!confirm('Delete the note "'+nbCur+'"? This removes its file.'))return;
-  clearTimeout(nbTimer); nbTimer=null;
-  await nbRemove(nbCur); nbCur=null;
-  nbNotes=await nbList();
-  if(!nbNotes.length){await nbWrite("Untitled",""); nbNotes=["Untitled"];}
-  await nbOpen(nbNotes[0]);
-}
-function buildNotebook(){
-  const src=document.getElementById("nb-source"); src.innerHTML="";
-  nbWire();
-  // notes are loaded once; the flush on view change protects unsaved keystrokes
-  nbBar();
-  document.querySelectorAll("#nb-blocks textarea").forEach(nbGrow);
-  if(rootDir && !nbLoaded)nbInit();
-  document.getElementById("nb-select").onchange=e=>nbOpen(e.target.value);
-  document.getElementById("nb-new").onclick=nbNew;
-  document.getElementById("nb-ren").onclick=nbRename;
-  document.getElementById("nb-del").onclick=nbDelete;
-  const hint=document.createElement("div"); hint.className="nb-src-hint";
-  hint.textContent=rootDir?"Drag an annotation or a session into the editor →":"Connect the export folder (pill in the top right) to save your notebook.";
-  src.appendChild(hint);
-  const g=projectGroups();
-  const order=Object.keys(g).sort((a,b)=>Math.max(...g[b].map(s=>s.mtime))-Math.max(...g[a].map(s=>s.mtime)));
-  let total=0;
-  order.forEach(proj=>{
-    const withAnns=g[proj].slice().sort((a,b)=>b.mtime-a.mtime)
-      .map(m=>({m,list:loadAnns(m.sid)})).filter(x=>x.list.length);
-    if(!withAnns.length)return;
-    const pcount=withAnns.reduce((t,x)=>t+x.list.length,0); total+=pcount;
-    const pd=document.createElement("div"); pd.className="nb-proj";
-    pd.innerHTML='<h2>'+esc(folderName(proj))+'<span class="c">'+pcount+' annotation'+(pcount>1?'s':'')+'</span></h2>';
-    withAnns.forEach(({m,list})=>{
-      const sd=document.createElement("div"); sd.className="nb-sess";
-      const h=document.createElement("h3"); h.textContent=effTitle(m);
-      h.draggable=true;
-      h.ondragstart=e=>{e.dataTransfer.setData("text/plain",nbSnippetSess(m));e.dataTransfer.effectAllowed="copy";};
-      h.onclick=()=>gotoAnn(m.sid,null); sd.appendChild(h);
-      list.slice().sort((a,b)=>a.start-b.start).forEach(a=>{
-        const it=document.createElement("div"); it.className="nb-item";
-        it.innerHTML='<span class="nb-dot" style="background:'+SWVAR[a.color||"1"]+'"></span>'+
-          '<div class="nb-body"><div class="nb-quote">'+esc(a.quote||"")+'</div>'+
-          (a.note?'<div class="nb-note">'+esc(a.note)+'</div>':'')+'</div>';
-        it.draggable=true;
-        it.ondragstart=e=>{e.dataTransfer.setData("text/plain",nbSnippetAnn(m,a));e.dataTransfer.effectAllowed="copy";e.stopPropagation();};
-        it.onclick=()=>gotoAnn(m.sid,a.id);
-        sd.appendChild(it);
-      });
-      pd.appendChild(sd);
-    });
-    src.appendChild(pd);
-  });
-  if(!total){const e=document.createElement("div");e.className="nb-empty";e.innerHTML="No annotations yet.<br>Highlight a passage in a session to see it appear here.";src.appendChild(e);}
-}
-function gotoAnn(sid,aid){
-  afterMountAid=aid;
-  setView("read");
-  if(curSid===sid){flashAnn(aid);afterMountAid=null;}
-  else openSession(sid);
-}
-function flashAnn(aid){
-  if(!aid)return;
-  const m=viewer.querySelector('mark.hl[data-aid="'+aid+'"]');
-  if(m){m.scrollIntoView({behavior:"smooth",block:"center"});m.classList.add("flash");setTimeout(()=>m.classList.remove("flash"),1100);}
 }
 
 /* ───── Organize : dossiers & sessions (couche metadata.json) ───── */
@@ -2061,7 +1482,6 @@ function mount(sid){
   document.getElementById("pager").style.display="flex";
   window.scrollTo({top:0});
   history.replaceState(null,"","#"+sid);
-  if(afterMountAid){const a=afterMountAid;afterMountAid=null;setTimeout(()=>flashAnn(a),60);}
 }
 
 function applyAllAnns(){

@@ -1,6 +1,6 @@
 # Memorium
 
-Turn your **Claude Code** sessions (`~/.claude/projects/*.jsonl`) into a clean, searchable HTML journal — read past conversations, full-text search across all of them, highlight and annotate passages, and keep a personal notebook. Pure Python **standard library**, a single file, **zero dependencies**.
+Turn your **Claude Code** sessions (`~/.claude/projects/*.jsonl`) into a clean, searchable HTML journal — read past conversations, full-text search across all of them, and highlight and annotate passages. Pure Python **standard library**, a single file, **zero dependencies**.
 
 [![CI](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml/badge.svg)](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml)
 ![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-3776AB?logo=python&logoColor=white)
@@ -18,7 +18,6 @@ Claude Code stores every session as raw JSONL under `~/.claude/projects`. That's
 - **Readable transcripts** — prompts, responses, tool calls and terminal output, laid out for long-form reading.
 - **Full-text search** across every session, prebuilt at export time (`searchindex.js`).
 - **Highlight & annotate** — select any passage, highlight in five colors, attach a comment. Persisted in `localStorage`.
-- **Notebook (Carnet)** — a free-text editor with drag-and-drop: pull any annotation or session into your notes as a quote with a back-reference. Autosaved to `data/carnet.md`.
 - **Logical organization** — rename sessions and folders, move sessions between folders. Stored in a derived metadata layer (`data/metadata.json`) that **never touches** the source JSONL.
 - **Offline-first** — system font stack, no web fonts, no CDN, no network calls. Open it on a plane.
 
@@ -26,7 +25,7 @@ Claude Code stores every session as raw JSONL under `~/.claude/projects`. That's
 
 `~/.claude/projects` is owned by Claude Code and indexed by its tooling. Renaming a folder or moving a `.jsonl` file would break that indexing. So every rename and move here is **logical only** — recorded in a separate `metadata.json` and resolved at display time. The source of truth stays untouched and every change is reversible. This is the core architectural trade-off, chosen deliberately over physically reorganizing files.
 
-Writing that metadata (and the notebook) requires the browser's **File System Access API**, which is disabled on `file://` pages. That's why write features run through `memorium serve`, which serves the export over `http://localhost` — a *secure context* — with a dumb static file server and no business logic on the server side.
+Writing that metadata requires the browser's **File System Access API**, which is disabled on `file://` pages. That's why write features run through `memorium serve`, which serves the export over `http://localhost` — a *secure context* — with a dumb static file server and no business logic on the server side.
 
 ## Install
 
@@ -56,7 +55,7 @@ memorium serve            # serve the export on http://localhost:8137 (unlocks w
 
 Output: `export/index.html` + `export/sessions/*.js` + `export/searchindex.js`. Everything is static — copy the folder anywhere and open `index.html`.
 
-Read-only browsing works from `file://` in any browser. **Annotations, notebook, and organization** need `memorium serve` and a Chromium browser (Chrome/Edge/Brave) for the File System Access API.
+Read-only browsing works from `file://` in any browser. **Annotations and organization** need `memorium serve` and a Chromium browser (Chrome/Edge/Brave) for the File System Access API.
 
 ## Updating
 
@@ -67,7 +66,7 @@ pipx upgrade memorium
 memorium           # or: memorium serve
 ```
 
-Re-running only rewrites the generated pages (`index.html`, `sessions/`, `searchindex.js`). Your `export/data/` — the notebook and any renames or moves — is never touched. Highlights and comments live in the browser (`localStorage`), keyed to how you open the export; browse through `memorium serve` so they keep a stable location and survive updates.
+Re-running only rewrites the generated pages (`index.html`, `sessions/`, `searchindex.js`). Your `export/data/` — any renames or moves — is never touched. Highlights and comments live in the browser (`localStorage`), keyed to how you open the export; browse through `memorium serve` so they keep a stable location and survive updates.
 
 ## Local development
 
