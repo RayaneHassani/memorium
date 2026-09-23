@@ -32,12 +32,12 @@ class DemoExportTest(unittest.TestCase):
         # index + one JS file per demo session
         self.assertTrue(os.path.exists(os.path.join(out, "index.html")))
         sessions = [f for f in os.listdir(os.path.join(out, "sessions")) if f.endswith(".js")]
-        self.assertEqual(len(sessions), 3)
+        self.assertEqual(len(sessions), 12)
 
-        # the manifest carries the three project names
+        # the manifest carries the four project names
         with open(os.path.join(out, "index.html"), encoding="utf-8") as f:
             index = f.read()
-        for project in ("webapp", "api", "cli"):
+        for project in ("webapp", "api", "cli", "deploy"):
             self.assertIn(project, index)
 
         # the full-text search index actually captured session content
@@ -45,6 +45,7 @@ class DemoExportTest(unittest.TestCase):
             search = f.read()
         self.assertIn("discount", search)
         self.assertIn("401", search)
+        self.assertIn("postgres", search)
 
 
 class SessionDateTest(unittest.TestCase):
