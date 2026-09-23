@@ -4,7 +4,7 @@
 Memorium — the memory of your Claude Code sessions, as a standalone static HTML site.
 
 - Reads the JSONL files in ~/.claude/projects (override with MEMORIUM_PROJECTS_DIR).
-- Writes index.html (dashboard, WebGL hero, full-text search) + sessions/*.js + searchindex.js.
+- Writes index.html (dashboard, animated welcome, full-text search) + sessions/*.js + searchindex.js.
 - Highlights, annotations; logical folder and session organisation
   through data/metadata.json — the JSONL source is NEVER modified.
 - Zero dependencies: stdlib only. Offline-first output, no network call.
@@ -915,7 +915,6 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   /* ═══════ Transitions entre vues ═══════ */
   .view.active{animation:viewIn .42s cubic-bezier(.22,.7,.2,1) both;}
   @keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-  body.welcome #topnav{display:none;}
 
   /* ═══════ Tableaux — rendus lisibles (fini les pipes bruts) ═══════ */
   .tbl-wrap{overflow-x:auto;margin:13px 0;border:1px solid var(--line);border-radius:var(--r-2);}
@@ -928,60 +927,45 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .tbl-wrap tbody tr:hover{background:rgba(0,0,0,.02);}
   .tbl-wrap code{white-space:nowrap;}
 
-  /* ═══════ Welcome / WebGL memory-ribbon hero ═══════ */
-  #view-welcome{padding-top:0;}
-  #view-welcome.active{display:flex;align-items:center;justify-content:center;min-height:100vh;}
-  /* welcome background: light grid + depth vignette */
-  body.welcome::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-    background:
-      radial-gradient(130% 100% at 50% 40%,transparent 0 48%,rgba(86,99,64,.13) 100%),
-      repeating-linear-gradient(0deg,rgba(86,99,64,.05) 0 1px,transparent 1px 38px),
-      repeating-linear-gradient(90deg,rgba(86,99,64,.05) 0 1px,transparent 1px 38px);}
-  .welcome-inner{position:relative;z-index:1;text-align:center;width:100%;padding:20px;}
-  /* wide 3D ribbon on top, title typed underneath */
-  .hero-stage{position:relative;width:min(1460px,98vw);height:300px;margin:0 auto -6px;}
-  #gl{position:absolute;inset:0;width:100%;height:100%;display:block;}
-  #glfail{display:none;color:var(--muted);font-size:var(--fs-3);padding:40px;}
-  /* signature move: a search bar types a query, a node answers */
-  .searchbar{position:absolute;left:50%;top:2%;transform:translateX(-50%);z-index:2;
-    display:flex;align-items:center;gap:10px;min-width:240px;
-    background:rgba(246,237,220,.7);backdrop-filter:blur(9px);
-    border:1px solid var(--line);border-radius:var(--r-3);padding:10px 16px;
-    font:var(--fs-4) var(--mono);color:var(--ink);box-shadow:0 10px 28px rgba(86,99,64,.14);
-    opacity:0;transition:opacity .5s;pointer-events:none;}
-  .searchbar .mag{color:var(--accent);font-size:var(--fs-5);line-height:1;}
-  .searchbar .q{white-space:nowrap;}
-  .searchbar .scaret{display:inline-block;width:.5ch;height:1.05em;background:var(--accent);
-    vertical-align:-.15em;animation:caret 1s step-end infinite;}
-  /* commit labels projected onto the nodes: the ribbon becomes a living git log */
-  .nlabel{position:absolute;left:0;top:0;z-index:2;font:var(--fs-1)/1.3 var(--mono);
-    color:var(--ink);white-space:nowrap;pointer-events:none;opacity:0;
-    transform:translate(-50%,-50%);
-    /* paper-coloured halo (map casing): readable even on top of the ribbon */
-    text-shadow:0 0 3px var(--paper),0 0 3px var(--paper),0 0 5px var(--paper),0 0 8px var(--paper);}
-  .nlabel .h{color:var(--accent-d);opacity:.85;letter-spacing:.02em;}
-  .nlabel.hit{font-weight:700;
-    text-shadow:0 0 3px var(--paper),0 0 3px var(--paper),0 0 5px var(--paper),0 0 9px rgba(142,156,99,.85);}
-  .nlabel.hit .h{color:var(--accent);opacity:1;}
-  #wTitle{font-size:clamp(44px,7vw,88px);font-weight:800;letter-spacing:-.04em;margin:0;color:var(--olive-dd);
-    white-space:nowrap;min-height:1.1em;line-height:1;}
-  #wTitle:after{content:"";display:inline-block;width:.055em;height:.9em;margin-left:.05em;vertical-align:-.1em;
+  /* ═══════ Welcome: title and search on the left, pen-drawn thread on the right ═══════ */
+  .welcome{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:40px;align-items:center;
+    max-width:1280px;margin:0 auto;min-height:calc(100vh - var(--nav-h));padding:40px 32px 56px;}
+  .w-left{max-width:480px;}
+  #wTitle{font-size:clamp(56px,7vw,96px);font-weight:600;line-height:1;letter-spacing:-.025em;color:var(--olive-dd);
+    margin:0;min-height:1em;white-space:nowrap;}
+  #wTitle:after{content:"";display:inline-block;width:.05em;height:.82em;margin-left:.06em;vertical-align:-.06em;
     background:var(--accent);animation:caret 1s step-end infinite;}
   #wTitle.typed:after{animation:none;opacity:0;}
   @keyframes caret{50%{opacity:0}}
-  .welcome-inner .wsub{color:var(--muted);font-size:var(--fs-5);
-    opacity:0;animation:upFade .8s 3.1s forwards;}
-  .enter-btn{margin-top:28px;font-size:var(--fs-4);padding:13px 26px;border-radius:var(--r-3);letter-spacing:.01em;
-    box-shadow:0 6px 20px rgba(142,156,99,.36);transition:transform .14s,box-shadow .14s,background .14s;
-    opacity:0;animation:upFade .8s 3.25s forwards;}
-  .enter-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(110,122,75,.44);}
-  .enter-btn:active{transform:translateY(0);}
-  .welcome-inner .wnote{margin-top:22px;font-size:var(--fs-2);letter-spacing:.14em;text-transform:uppercase;
-    color:var(--muted);opacity:0;animation:upFade .8s 3.4s forwards;}
-  @keyframes upFade{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .wsub{font-size:var(--fs-5);line-height:1.5;color:var(--muted);margin:18px 0 30px;max-width:30ch;}
+  .wsearch{display:flex;align-items:center;gap:10px;background:var(--white);border:1px solid var(--line);border-radius:var(--r-2);
+    padding:0 14px;height:48px;transition:border-color .15s,box-shadow .15s;}
+  .wsearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(142,156,99,.18);}
+  .wsearch .mag{color:var(--muted);font-size:var(--fs-5);line-height:1;}
+  .wsearch input{flex:1;min-width:0;border:0;outline:0;background:none;font:var(--fs-3)/1 var(--mono);color:var(--ink);}
+  .wsearch input::placeholder{font-family:var(--text);color:var(--muted);opacity:.75;}
+  .wsearch kbd{font-size:var(--fs-1);line-height:1;color:var(--muted);border:1px solid var(--line);border-radius:var(--r-1);padding:4px 6px;}
+  .enter-btn{margin-top:22px;display:inline-flex;align-items:center;gap:10px;font-size:var(--fs-3);padding:14px 22px;
+    box-shadow:0 6px 18px rgba(110,122,75,.26);transition:transform .14s,background .14s,box-shadow .14s;}
+  .enter-btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(110,122,75,.32);}
+  .enter-btn:active{transform:none;}
+  .wnote{margin-top:26px;font:500 var(--fs-1)/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+  .w-fade{opacity:0;animation:upFade .7s forwards;}
+  @keyframes upFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .w-right svg{display:block;width:100%;height:auto;overflow:visible;}
+  .wlbl{font:400 var(--fs-1) var(--mono);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .wlbl .h{fill:var(--accent-d);opacity:.85;}
+  .wlbl .m{fill:var(--ink);}
+  .wlbl.hit{font-weight:700;}
+  .wlbl.hit .h{fill:var(--accent);opacity:1;}
+  @media (max-width:900px){
+    .welcome{grid-template-columns:1fr;gap:12px;padding:32px 16px 48px;min-height:0;}
+    .w-left{max-width:none;}
+  }
   @media (prefers-reduced-motion:reduce){
     #wTitle:after{animation:none;opacity:0;}
-    .welcome-inner .wsub,.enter-btn,.welcome-inner .wnote{animation:none!important;opacity:1;transform:none;}
+    .w-fade{animation:none;opacity:1;transform:none;}
+    .enter-btn{transition:none;}
   }
 
   /* ═══════ Full-text search results ═══════ */
@@ -1030,15 +1014,36 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 </nav>
 
 <section id="view-welcome" class="view active">
-  <div class="welcome-inner">
-    <div class="hero-stage">
-      <canvas id="gl"></canvas><div id="glfail">WebGL indisponible sur ce navigateur.</div>
-      <div class="searchbar" id="sbar"><span class="mag">⌕</span><span class="q" id="sq"></span><span class="scaret"></span></div>
+  <div class="welcome">
+    <div class="w-left">
+      <h1 id="wTitle"></h1>
+      <p class="wsub w-fade" style="animation-delay:1.1s">The living memory of your Claude&nbsp;Code sessions &mdash; reread, search, annotate.</p>
+      <form id="wform" class="w-fade" style="animation-delay:1.25s" autocomplete="off">
+        <label class="wsearch"><span class="mag" aria-hidden="true">⌕</span>
+          <input id="wq" type="search" placeholder="Search every session…" aria-label="Search every session">
+          <kbd>Enter</kbd></label>
+      </form>
+      <button id="enterBtn" class="enter-btn w-fade" style="animation-delay:1.4s">Open the journal →</button>
+      <div class="wnote w-fade" style="animation-delay:1.55s">__COUNT__ conversations indexed</div>
     </div>
-    <h1 id="wTitle"></h1>
-    <p class="wsub">The living memory of your Claude&nbsp;Code sessions &mdash; reread, search, annotate.</p>
-    <button id="enterBtn" class="enter-btn">Open the journal →</button>
-    <div class="wnote">__COUNT__ conversations indexed</div>
+    <div class="w-right" aria-hidden="true">
+      <svg id="thread" viewBox="0 0 640 380">
+        <defs>
+          <mask id="reveal" maskUnits="userSpaceOnUse" x="-20" y="-20" width="680" height="420">
+            <path id="maskPath" fill="none" stroke="#fff" stroke-width="46" stroke-linecap="round"/>
+          </mask>
+          <linearGradient id="beamGlow" x1="0" x2="1">
+            <stop offset="0" style="stop-color:var(--accent);stop-opacity:0"/>
+            <stop offset=".5" style="stop-color:var(--accent);stop-opacity:.26"/>
+            <stop offset="1" style="stop-color:var(--accent);stop-opacity:0"/>
+          </linearGradient>
+        </defs>
+        <g id="threadStroke" mask="url(#reveal)"><path id="threadBody" fill="var(--accent)"/></g>
+        <path id="threadArrow" fill="none" stroke="var(--accent)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>
+        <g id="threadNodes"></g>
+        <g id="beam" opacity="0"><rect x="-22" y="16" width="44" height="348" fill="url(#beamGlow)"/><rect x="-1" y="16" width="2" height="348" rx="1" fill="var(--accent-d)"/></g>
+      </svg>
+    </div>
   </div>
 </section>
 
@@ -1256,7 +1261,6 @@ function updateDirPill(){
 /* ───── Navigation entre vues ───── */
 function setView(v){
   curView=v;
-  document.body.classList.toggle("welcome",v==="welcome");
   if(window.__heroSetActive)window.__heroSetActive(v==="welcome");
   document.querySelectorAll(".view").forEach(e=>e.classList.toggle("active",e.id==="view-"+v));
   document.querySelectorAll(".nav-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
@@ -1785,389 +1789,153 @@ let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(ref
     localStorage.setItem(KEY,parseInt(layout.style.getPropertyValue("--side-w"))||300);});
 })();
 
-/* ═════════ Welcome hero: WebGL memory ribbon (zero dependency) ═════════
-   Gating perf : la boucle rAF ne tourne que quand la vue welcome est visible,
-   driven by setView through window.__heroSetActive. */
+/* ═════════ Welcome: pen-drawn thread ═════════
+   One sequence: the left column settles, a demo query is typed into the real search
+   field, and from its first word on the search itself draws the thread: the scan beam
+   is the pen tip. It sprouts the commit nodes, locks on the matching one, then hands
+   the field back and lets the thread breathe. The rAF loop only runs while the welcome
+   view is visible (setView -> window.__heroSetActive). */
 (function(){
-const canvas=document.getElementById("gl");
-const titleEl=document.getElementById("wTitle");
-const WORD="Memorium";
 const RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
-const gl=canvas.getContext("webgl",{antialias:true,alpha:true,depth:true,premultipliedAlpha:false})
-       ||canvas.getContext("experimental-webgl",{antialias:true,alpha:true,depth:true});
-if(!gl){canvas.style.display="none";document.getElementById("glfail").style.display="block";
-  titleEl.textContent=WORD;titleEl.classList.add("typed");
-  window.__heroSetActive=function(){};return;}
+const NS="http://www.w3.org/2000/svg", W=640, H=380, N=220;
+const WORD="Memorium", titleEl=document.getElementById("wTitle"), wq=document.getElementById("wq");
+const NODES=[
+  {t:.10,up:true, h:"3e1f0aa",m:"feat: session export"},
+  {t:.26,up:false,h:"9b01e44",m:"fix: docker port map"},
+  {t:.42,up:true, h:"f24d80c",m:"feat: dark mode"},
+  {t:.58,up:false,h:"a3f2c1d",m:"fix: auth token bug"},
+  {t:.74,up:true, h:"c98d517",m:"perf: lazy render"},
+  {t:.90,up:false,h:"7d40b2e",m:"test: playwright e2e"}
+];
+const QUERY="auth bug", HIT=3;
+const SPROUT=.38, TYPE_CH=.028;
+const QSTART=2.4, CH=.09, DRAW0=QSTART+4*CH, DRAW=1.9;   // the pen starts on "auth"
+const SCAN_END=DRAW0+DRAW+1.4;
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+const easeInv=y=>y<.5?Math.sqrt(y/2):1-Math.sqrt(2*(1-y))/2;
+const backOut=x=>{const c=1.7;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2);};
+const clamp01=x=>Math.max(0,Math.min(1,x));
+const reach=t=>DRAW0+DRAW*easeInv(t);                     // when the pen tip reaches position t
 
-/* ── tiny mat4 algebra (column-major, gl-matrix style) ── */
-function perspective(fovy,aspect,near,far){
-  const f=1/Math.tan(fovy/2), nf=1/(near-far);
-  return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+function centre(t,ph,amp){
+  const x=36+t*(W-96), env=.55+.45*Math.sin(Math.PI*t);
+  return [x, H/2+62*env*Math.sin(t*Math.PI*2.5+.35)+amp*Math.sin(t*Math.PI*3+ph)];
 }
-function lookAt(eye,ctr,up){
-  let z0=eye[0]-ctr[0],z1=eye[1]-ctr[1],z2=eye[2]-ctr[2];
-  let rl=1/Math.hypot(z0,z1,z2); z0*=rl;z1*=rl;z2*=rl;
-  let x0=up[1]*z2-up[2]*z1, x1=up[2]*z0-up[0]*z2, x2=up[0]*z1-up[1]*z0;
-  rl=1/Math.hypot(x0,x1,x2)||0; x0*=rl;x1*=rl;x2*=rl;
-  let y0=z1*x2-z2*x1, y1=z2*x0-z0*x2, y2=z0*x1-z1*x0;
-  return new Float32Array([x0,y0,z0,0, x1,y1,z1,0, x2,y2,z2,0,
-    -(x0*eye[0]+x1*eye[1]+x2*eye[2]), -(y0*eye[0]+y1*eye[1]+y2*eye[2]), -(z0*eye[0]+z1*eye[1]+z2*eye[2]), 1]);
+function width(t){                                        // pen pressure: thin entry, full belly, taper before the arrow
+  return 1.1+5.6*Math.pow(Math.sin(Math.PI*Math.min(1,t*1.06)),.7)*(.88+.12*Math.sin(t*17));
 }
-function mul(a,b){
-  const o=new Float32Array(16);
-  for(let c=0;c<4;c++)for(let r=0;r<4;r++){
-    o[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
+function geometry(ph,amp){
+  const P=[],L=[],R=[];
+  for(let i=0;i<=N;i++)P.push(centre(i/N,ph,amp));
+  for(let i=0;i<=N;i++){
+    const a=P[Math.max(0,i-1)],b=P[Math.min(N,i+1)];
+    let dx=b[0]-a[0],dy=b[1]-a[1]; const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+    const w=width(i/N)/2;
+    L.push([P[i][0]-dy*w,P[i][1]+dx*w]); R.push([P[i][0]+dy*w,P[i][1]-dx*w]);
   }
-  return o;
+  const f=p=>p[0].toFixed(1)+" "+p[1].toFixed(1);
+  return {P, body:"M"+L.map(f).join("L")+"L"+R.reverse().map(f).join("L")+"Z", line:"M"+P.map(f).join("L")};
 }
 
-/* ── shaders ── */
-const VS=`
-attribute vec3 aPos; attribute vec3 aNor; attribute float aS; attribute float aV;
-uniform mat4 uMVP;
-varying vec3 vN; varying vec3 vW; varying float vS; varying float vV;
-void main(){ gl_Position=uMVP*vec4(aPos,1.0); vN=aNor; vW=aPos; vS=aS; vV=aV; }`;
-const FS=`
-precision highp float;
-varying vec3 vN; varying vec3 vW; varying float vS; varying float vV;
-uniform vec3 uCam; uniform float uScan;
-const vec3 GREEN=vec3(.557,.612,.388);
-const vec3 BROWN=vec3(.412,.376,.306);
-const vec3 INK=vec3(.337,.388,.251);
-const vec3 CREAM=vec3(.965,.929,.863);
-void main(){
-  vec3 N=normalize(vN); if(!gl_FrontFacing) N=-N;
-  vec3 L=normalize(vec3(.35,.85,.55));
-  vec3 V=normalize(uCam-vW);
-  vec3 H=normalize(L+V);
-  float diff=max(dot(N,L),0.0);
-  float spec=pow(max(dot(N,H),0.0),26.0);
-  float rim=pow(1.0-max(dot(N,V),0.0),2.6);
-  vec3 base = gl_FrontFacing ? mix(BROWN,GREEN,0.7) : mix(INK,BROWN,0.55);
-  vec3 col = base*(0.32+0.74*diff) + spec*CREAM*0.55 + rim*GREEN*0.30;
-  if(uScan>=0.0){
-    float scan=smoothstep(0.05,0.0,abs(vS-uScan));
-    col += scan*mix(GREEN,CREAM,0.55)*0.65*(1.0-abs(vV)*0.5);
+const strokeG=document.getElementById("threadStroke"), bodyEl=document.getElementById("threadBody");
+const maskEl=document.getElementById("maskPath"), arrowEl=document.getElementById("threadArrow");
+const beam=document.getElementById("beam"), nodesG=document.getElementById("threadNodes");
+const nodeEls=NODES.map(()=>{
+  const g=document.createElementNS(NS,"g");
+  g.innerHTML='<circle class="ring" r="9" fill="none" stroke="var(--accent)" stroke-width="2" opacity="0"/>'+
+    '<line stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/>'+
+    '<circle class="pearl" r="0" fill="var(--accent2)" stroke="var(--accent-d)" stroke-width="2.2"/>'+
+    '<text class="wlbl" text-anchor="middle"><tspan class="h"></tspan><tspan class="m"></tspan></text>';
+  nodesG.appendChild(g);
+  return {ring:g.querySelector(".ring"),stem:g.querySelector("line"),pearl:g.querySelector(".pearl"),
+          lbl:g.querySelector(".wlbl"),h:g.querySelector(".h"),m:g.querySelector(".m")};
+});
+
+let running=false, rafId=0, t0=0, typeTimer=null, maskOff=false, userTook=false, demoTyping=false;
+function takeOver(){ if(!userTook){ userTook=true; if(demoTyping)wq.value=""; demoTyping=false; } }
+wq.addEventListener("pointerdown",takeOver);
+wq.addEventListener("keydown",takeOver);
+document.getElementById("wform").onsubmit=e=>{
+  e.preventDefault();
+  const q=wq.value.trim(); if(!q)return;
+  const s=document.getElementById("search");
+  setView("read"); s.value=q; onSearch(q); s.focus();
+};
+
+function frame(now){
+  const e=RM?99:(now-t0)/1000;
+  const breathe=RM?0:clamp01((e-SCAN_END)/2);
+  const {P,body,line}=geometry(e*Math.PI*2/9,4.5*breathe);
+  bodyEl.setAttribute("d",body);
+
+  const front=ease(clamp01((e-DRAW0)/DRAW));             // pen reveal through a mask, dropped once complete
+  if(!maskOff){
+    maskEl.setAttribute("d",line);
+    const len=maskEl.getTotalLength();
+    maskEl.style.strokeDasharray=len; maskEl.style.strokeDashoffset=len*(1-front);
+    if(front>=1){ strokeG.removeAttribute("mask"); maskOff=true; }
   }
-  gl_FragColor=vec4(col,1.0);
-}`;
-const VS_TK=`
-attribute vec3 aPos; attribute float aB;
-uniform mat4 uMVP; varying float vB;
-void main(){ gl_Position=uMVP*vec4(aPos,1.0); vB=aB; }`;
-const FS_TK=`
-precision highp float; varying float vB;
-const vec3 GREEN=vec3(.557,.612,.388);
-const vec3 DK=vec3(.337,.388,.251);
-const vec3 CREAM=vec3(.973,.957,.902);
-void main(){
-  vec3 col=mix(mix(DK,GREEN,0.6), CREAM, vB);
-  gl_FragColor=vec4(col,1.0);
-}`;
-const VS_PG=`
-attribute vec3 aPos; attribute float aA;
-uniform mat4 uMVP; varying float vA;
-void main(){ gl_Position=uMVP*vec4(aPos,1.0); vA=aA; }`;
-const FS_PG=`
-precision highp float; varying float vA;
-const vec3 CREAM=vec3(.973,.957,.902);
-const vec3 GREEN=vec3(.557,.612,.388);
-void main(){ gl_FragColor=vec4(mix(GREEN,CREAM,0.55), vA); }`;
-function sh(type,src){const o=gl.createShader(type);gl.shaderSource(o,src);gl.compileShader(o);
-  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o;}
-function makeProg(vs,fs,binds){
-  const p=gl.createProgram();
-  gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));
-  gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
-  binds.forEach(function(n,i){gl.bindAttribLocation(p,i,n);});
-  gl.linkProgram(p);
-  if(!gl.getProgramParameter(p,gl.LINK_STATUS))console.error(gl.getProgramInfoLog(p));
-  return p;
-}
-const prog=makeProg(VS,FS,["aPos","aNor","aS","aV"]);
-const loc={uMVP:gl.getUniformLocation(prog,"uMVP"),uCam:gl.getUniformLocation(prog,"uCam"),uScan:gl.getUniformLocation(prog,"uScan")};
-const ptProg=makeProg(VS_TK,FS_TK,["aPos","aB"]);
-const ploc={uMVP:gl.getUniformLocation(ptProg,"uMVP")};
-const pgProg=makeProg(VS_PG,FS_PG,["aPos","aA"]);
-const pgloc={uMVP:gl.getUniformLocation(pgProg,"uMVP")};
 
-/* ── ribbon geometry (rebuilt each frame for the rotation) ── */
-const NSEG=300, HW=0.60, SPAN=26.0, TWIST=1.4;
-const bPos=gl.createBuffer(), bNor=gl.createBuffer(), bS=gl.createBuffer(), bV=gl.createBuffer();
-const posA=new Float32Array((NSEG+1)*6), norA=new Float32Array((NSEG+1)*6),
-      sA=new Float32Array((NSEG+1)*2), vA=new Float32Array((NSEG+1)*2);
-// positions + sizes + face (±1): nodes on BOTH sides of the ribbon, spaced out for the labels
-const NODES=[0.06,0.21,0.37,0.55,0.72,0.88];
-const NSIZE=[0.95, 1.15, 0.8, 1.2, 0.85, 1.05];
-const NFACE=[1,  -1,   1,   -1,  -1,   1];
-const ROT=0.25;                                            // rotation de la bande sur son axe (rad/s)
-const STEM_LEN=0.52, STEM_W=0.018, NODE_R=0.155, NSEGC=18;
-const VPM=6 + NSEGC*3;                                     // sommets par marqueur (tige + perle)
-const bTk=gl.createBuffer();
-const PSEG=44, bPg=gl.createBuffer();
-const pgA=new Float32Array(PSEG*6*4);                      // anneau ping : (xyz + alpha) par sommet
-const tkA=new Float32Array(NODES.length*VPM*4);            // (xyz + brightness) par sommet
+  const end=P[N], pre=P[N-6];                             // arrowhead, as in the logo
+  const ang=Math.atan2(end[1]-pre[1],end[0]-pre[0]), s=13, sp=.62;
+  arrowEl.setAttribute("d","M"+(end[0]-s*Math.cos(ang-sp))+" "+(end[1]-s*Math.sin(ang-sp))+"L"+end.join(" ")+
+    "L"+(end[0]-s*Math.cos(ang+sp))+" "+(end[1]-s*Math.sin(ang+sp)));
+  arrowEl.setAttribute("opacity",clamp01((e-DRAW0-DRAW*.92)/.25));
 
-function curve(s,out){
-  // FROZEN shape (static): nodes stay put, the ripple causes no churn
-  const env=Math.sin(Math.PI*Math.min(1,Math.max(0,s)));
-  out[0]=(s-0.5)*SPAN;
-  out[1]=env*(1.02*Math.sin(s*4.2+0.6) + 0.30*Math.sin(s*9.0+0.9));
-  out[2]=env*(0.40*Math.sin(s*3.0+1.1));
-}
-const _a=[0,0,0],_b=[0,0,0];
-// local frame (spine point + width W + normal N) — spine is frozen, W/N rotate over time
-const _fp=[0,0,0],_fW=[0,0,0],_fN=[0,0,0];
-function computeFrame(s,t){
-  curve(s,_fp);
-  curve(Math.max(0,s-1/NSEG),_a);
-  curve(Math.min(1,s+1/NSEG),_b);
-  let Tx=_b[0]-_a[0],Ty=_b[1]-_a[1],Tz=_b[2]-_a[2];
-  let tl=1/(Math.hypot(Tx,Ty,Tz)||1); Tx*=tl;Ty*=tl;Tz*=tl;
-  let ux=0,uy=1,uz=0;
-  if(Math.abs(Tx*ux+Ty*uy+Tz*uz)>0.9){ux=1;uy=0;uz=0;}
-  let sx=Ty*uz-Tz*uy, sy=Tz*ux-Tx*uz, sz=Tx*uy-Ty*ux;
-  let sl=1/(Math.hypot(sx,sy,sz)||1); sx*=sl;sy*=sl;sz*=sl;
-  let nx=sy*Tz-sz*Ty, ny=sz*Tx-sx*Tz, nz=sx*Ty-sy*Tx;
-  const th=TWIST*s + t*ROT, c=Math.cos(th), sn=Math.sin(th);
-  _fW[0]=sx*c+nx*sn; _fW[1]=sy*c+ny*sn; _fW[2]=sz*c+nz*sn;
-  _fN[0]=-sx*sn+nx*c; _fN[1]=-sy*sn+ny*c; _fN[2]=-sz*sn+nz*c;
-}
-function buildRibbon(t){
-  for(let i=0;i<=NSEG;i++){
-    const s=i/NSEG;
-    computeFrame(s,t);
-    const Wx=_fW[0],Wy=_fW[1],Wz=_fW[2], Nx=_fN[0],Ny=_fN[1],Nz=_fN[2];
-    const k=i*6;
-    posA[k]=_fp[0]-Wx*HW; posA[k+1]=_fp[1]-Wy*HW; posA[k+2]=_fp[2]-Wz*HW;
-    posA[k+3]=_fp[0]+Wx*HW; posA[k+4]=_fp[1]+Wy*HW; posA[k+5]=_fp[2]+Wz*HW;
-    norA[k]=Nx;norA[k+1]=Ny;norA[k+2]=Nz; norA[k+3]=Nx;norA[k+4]=Ny;norA[k+5]=Nz;
-    sA[i*2]=s; sA[i*2+1]=s; vA[i*2]=-1; vA[i*2+1]=1;
-  }
-  gl.bindBuffer(gl.ARRAY_BUFFER,bPos);gl.bufferData(gl.ARRAY_BUFFER,posA,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-  gl.bindBuffer(gl.ARRAY_BUFFER,bNor);gl.bufferData(gl.ARRAY_BUFFER,norA,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);
-  gl.bindBuffer(gl.ARRAY_BUFFER,bS);gl.bufferData(gl.ARRAY_BUFFER,sA,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,0,0);
-  gl.bindBuffer(gl.ARRAY_BUFFER,bV);gl.bufferData(gl.ARRAY_BUFFER,vA,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,0,0);
-}
+  const beamOn=!RM&&!userTook&&e>DRAW0&&e<DRAW0+DRAW+.35;  // the beam rides the pen tip
+  beam.setAttribute("opacity",beamOn?Math.min(clamp01((e-DRAW0)/.2),clamp01((DRAW0+DRAW+.35-e)/.3)):0);
+  beam.setAttribute("transform","translate("+P[Math.round(front*N)][0].toFixed(1)+" 0)");
 
-function pushVert(k,x,y,z,b){ tkA[k]=x;tkA[k+1]=y;tkA[k+2]=z;tkA[k+3]=b;return k+4; }
-function buildTicks(progress,activeNode,intensity,t){
-  let k=0;
-  for(let i=0;i<NODES.length;i++){
-    const s=NODES[i];
-    const reveal=Math.min(1,Math.max(0,(progress-s)/0.045));   // germe quand le front passe, PUIS persiste
-    if(reveal<=0){ for(let z=0;z<VPM;z++) k=pushVert(k,0,0,0,0); continue; }
-    const sc=easeOutCubic(reveal);
-    computeFrame(s,t);
-    const f=NFACE[i];
-    const px=_fp[0], py=_fp[1], pz=_fp[2];
-    const nx=_fN[0]*f, ny=_fN[1]*f, nz=_fN[2]*f;
-    const len=STEM_LEN*sc;
-    const tx=px+nx*len, ty=py+ny*len, tz=pz+nz*len;
-    const wx=_fW[0]*STEM_W, wy=_fW[1]*STEM_W, wz=_fW[2]*STEM_W;
-    const lock=(i===activeNode)?intensity:0, rim=0.12+0.55*lock;
-    k=pushVert(k, px-wx,py-wy,pz-wz, .12); k=pushVert(k, px+wx,py+wy,pz+wz, .12); k=pushVert(k, tx+wx,ty+wy,tz+wz, .5);
-    k=pushVert(k, px-wx,py-wy,pz-wz, .12); k=pushVert(k, tx+wx,ty+wy,tz+wz, .5); k=pushVert(k, tx-wx,ty-wy,tz-wz, .5);
-    const R=NODE_R*NSIZE[i]*sc*(1+0.45*lock);
-    for(let j=0;j<NSEGC;j++){
-      const a0=(j/NSEGC)*6.283185, a1=((j+1)/NSEGC)*6.283185;
-      k=pushVert(k, tx,ty,tz, 1.0);
-      k=pushVert(k, tx+Math.cos(a0)*R, ty+Math.sin(a0)*R, tz, rim);
-      k=pushVert(k, tx+Math.cos(a1)*R, ty+Math.sin(a1)*R, tz, rim);
+  NODES.forEach((n,i)=>{
+    const el=nodeEls[i], p=P[Math.round(n.t*N)], born=reach(n.t);
+    const g=RM?1:clamp01((e-born)/SPROUT), dir=n.up?-1:1;
+    const tipY=p[1]+dir*(width(n.t)/2+40*ease(g));
+    el.stem.setAttribute("x1",p[0]); el.stem.setAttribute("y1",p[1]);
+    el.stem.setAttribute("x2",p[0]); el.stem.setAttribute("y2",tipY);
+    el.pearl.setAttribute("cx",p[0]); el.pearl.setAttribute("cy",tipY);
+    el.pearl.setAttribute("r",g>0?8.5*Math.max(0,backOut(g)):0);
+    const chars=RM?99:Math.floor(Math.max(0,e-born-SPROUT*.6)/TYPE_CH);
+    el.h.textContent=chars>0?n.h+" ":"";
+    el.m.textContent=n.m.slice(0,Math.max(0,chars-8));
+    el.lbl.setAttribute("x",p[0]); el.lbl.setAttribute("y",tipY+dir*20+(n.up?0:4));
+    const hit=i===HIT&&!RM&&!userTook&&e>born&&e<SCAN_END+.8;
+    el.lbl.classList.toggle("hit",hit);
+    el.ring.setAttribute("cx",p[0]); el.ring.setAttribute("cy",tipY);
+    if(hit){ const q=((e-born)%.9)/.9; el.ring.setAttribute("r",9+16*q); el.ring.setAttribute("opacity",.7*(1-q)); }
+    else el.ring.setAttribute("opacity",0);
+  });
+
+  if(!RM&&!userTook){                                     // demo query typed into the real field, then handed back
+    if(e>QSTART&&e<SCAN_END){ demoTyping=true; wq.value=QUERY.slice(0,Math.floor((e-QSTART)/CH)); }
+    else if(e>=SCAN_END&&demoTyping){
+      const left=Math.ceil(QUERY.length*(1-clamp01((e-SCAN_END)/.45)));
+      wq.value=QUERY.slice(0,left); if(!left)demoTyping=false;
     }
   }
-  gl.bindBuffer(gl.ARRAY_BUFFER,bTk);gl.bufferData(gl.ARRAY_BUFFER,tkA,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,16,0);
-  gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,1,gl.FLOAT,false,16,12);
-}
-function pushPg(k,x,y,z,a){ pgA[k]=x;pgA[k+1]=y;pgA[k+2]=z;pgA[k+3]=a;return k+4; }
-// ping ring bursting out of the matched node (pingT 0→1 = young→faded)
-function buildPing(active,pingT,intensity,t){
-  computeFrame(NODES[active],t);
-  const f=NFACE[active], len=STEM_LEN;
-  const cx=_fp[0]+_fN[0]*f*len, cy=_fp[1]+_fN[1]*f*len, cz=_fp[2]+_fN[2]*f*len;
-  const baseR=NODE_R*NSIZE[active];
-  const R=baseR + easeOutCubic(pingT)*0.62;
-  const hw=0.02+pingT*0.02;
-  const a=Math.pow(1-pingT,1.7)*intensity*0.95;
-  let k=0;
-  for(let j=0;j<PSEG;j++){
-    const a0=j/PSEG*6.283185, a1=(j+1)/PSEG*6.283185;
-    const c0=Math.cos(a0),s0=Math.sin(a0),c1=Math.cos(a1),s1=Math.sin(a1);
-    k=pushPg(k, cx+c0*(R-hw),cy+s0*(R-hw),cz, a); k=pushPg(k, cx+c0*(R+hw),cy+s0*(R+hw),cz, a); k=pushPg(k, cx+c1*(R+hw),cy+s1*(R+hw),cz, a);
-    k=pushPg(k, cx+c0*(R-hw),cy+s0*(R-hw),cz, a); k=pushPg(k, cx+c1*(R+hw),cy+s1*(R+hw),cz, a); k=pushPg(k, cx+c1*(R-hw),cy+s1*(R-hw),cz, a);
-  }
-  gl.bindBuffer(gl.ARRAY_BUFFER,bPg);gl.bufferData(gl.ARRAY_BUFFER,pgA,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,16,0);
-  gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,1,gl.FLOAT,false,16,12);
+  if(running&&!RM)rafId=requestAnimationFrame(frame);
 }
 
-let projM=null;
-function resize(){
-  const dpr=Math.min(2,window.devicePixelRatio||1);
-  const w=canvas.clientWidth,h=canvas.clientHeight;
-  if(!w||!h)return;
-  canvas.width=w*dpr;canvas.height=h*dpr;
-  gl.viewport(0,0,canvas.width,canvas.height);
-  projM=perspective(45*Math.PI/180, w/h, 0.1, 100);
-}
-
-const CAM=[0,0.10,9.8];
-const DRAW_DUR=2.4;                                   // left-to-right draw (slow enough to watch the nodes appear one by one)
-function easeOutCubic(x){return 1-Math.pow(1-x,3);}
-
-function render(elapsed,sig){
-  if(!projM)return;
-  const progress=Math.min(1,elapsed/DRAW_DUR);
-  const active = sig?sig.activeNode:-1, inten = sig?sig.intensity:0;
-  gl.clearColor(0,0,0,0);
-  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-  const view=lookAt(CAM,[0,0,0],[0,1,0]);
-  const mvp=mul(projM,view);
-  curMVP=mvp;                                         // shared with the label projection
-
-  // pass 1: ribbon, revealed up to the draw front
-  gl.useProgram(prog);
-  gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
-  buildRibbon(elapsed);
-  gl.uniformMatrix4fv(loc.uMVP,false,mvp);
-  gl.uniform3fv(loc.uCam,CAM);
-  gl.uniform1f(loc.uScan, active>=0 ? NODES[active] : -1);
-  const pairs=Math.max(1,Math.floor(NSEG*progress));
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,(pairs+1)*2);
-
-  // pass 2: commit nodes on both faces (sprout one by one, orbit, persist)
-  gl.useProgram(ptProg);
-  gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
-  buildTicks(progress,active,inten,elapsed);
-  gl.uniformMatrix4fv(ploc.uMVP,false,mvp);
-  gl.drawArrays(gl.TRIANGLES,0,NODES.length*VPM);
-
-  // pass 3: radar ping on the matched node (transparent, does not write depth)
-  const pingT = sig?sig.pingT:-1;
-  if(active>=0 && pingT>=0 && inten>0){
-    gl.useProgram(pgProg);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    gl.enable(gl.DEPTH_TEST); gl.depthMask(false);
-    buildPing(active,pingT,inten,elapsed);
-    gl.uniformMatrix4fv(pgloc.uMVP,false,mvp);
-    gl.drawArrays(gl.TRIANGLES,0,PSEG*6);
-    gl.depthMask(true); gl.disable(gl.BLEND);
-  }
-}
-
-/* signature: typed queries, each one lighting up its own node */
-const QUERIES=[{q:"auth bug",node:3},{q:"docker port",node:1},{q:"playwright test",node:5}];
-const SIG_START=DRAW_DUR+1.6, CYCLE=4.0;
-function computeSig(elapsed){
-  if(elapsed<SIG_START) return {visible:false,text:"",activeNode:-1,intensity:0,pingT:-1};
-  const e=elapsed-SIG_START, qi=Math.floor(e/CYCLE)%QUERIES.length, ct=e%CYCLE, Q=QUERIES[qi];
-  let text="",activeNode=-1,intensity=0,pingT=-1;
-  if(ct<1.0){ text=Q.q.slice(0,Math.floor((ct/1.0)*Q.q.length)); }
-  else if(ct<3.1){ text=Q.q;
-    if(ct>1.25){ activeNode=Q.node;
-      intensity=Math.min(1,(ct-1.25)/0.25);
-      if(ct>2.7) intensity*=Math.max(0,1-(ct-2.7)/0.4);
-      pingT=((ct-1.25)%0.9)/0.9; } }                                     // repeating radar pings
-  else { const er=Math.max(0,1-(ct-3.1)/0.5); text=Q.q.slice(0,Math.ceil(Q.q.length*er)); }
-  return {visible:true,text,activeNode,intensity,pingT};
-}
-const sbar=document.getElementById("sbar"), sq=document.getElementById("sq");
-function updateSearchBar(sig){ sbar.style.opacity=sig.visible?"1":"0"; sq.textContent=sig.text; }
-
-/* commit labels: hash stamped when the node sprouts, message typed letter by letter.
-   The search bar queries match these messages → the scene tells a single story. */
-const LABELS=[
-  {h:"3e1f0aa",m:"feat: session export"},
-  {h:"9b01e44",m:"fix: docker port map"},
-  {h:"f24d80c",m:"feat: dark mode"},
-  {h:"a3f2c1d",m:"fix: auth token bug"},
-  {h:"c98d517",m:"perf: lazy render"},
-  {h:"7d40b2e",m:"test: playwright e2e"}
-];
-const stage=document.querySelector(".hero-stage");
-const labelEls=LABELS.map(function(){
-  const d=document.createElement("div"); d.className="nlabel";
-  d.innerHTML='<span class="h"></span> <span class="m"></span>';
-  stage.appendChild(d);
-  return {root:d,h:d.firstChild,m:d.lastChild};
-});
-const TYPE_CPS=26;                                   // vitesse de frappe des messages de commit
-let curMVP=null;
-const _pt=[0,0],_pb=[0,0];
-function project(x,y,z,out){
-  const m=curMVP;
-  const w=m[3]*x+m[7]*y+m[11]*z+m[15];
-  out[0]=((m[0]*x+m[4]*y+m[8]*z+m[12])/w*0.5+0.5)*canvas.clientWidth;
-  out[1]=(0.5-(m[1]*x+m[5]*y+m[9]*z+m[13])/w*0.5)*canvas.clientHeight;
-}
-function updateLabels(elapsed,sig){
-  if(!curMVP)return;
-  const progress=Math.min(1,elapsed/DRAW_DUR);
-  const pxu=canvas.clientWidth/SPAN;                 // ≈ pixels per world unit
-  for(let i=0;i<LABELS.length;i++){
-    const L=labelEls[i], s=NODES[i];
-    const reveal=Math.min(1,Math.max(0,(progress-s)/0.045));
-    if(reveal<=0){ L.root.style.opacity="0"; continue; }
-    computeFrame(s,elapsed);
-    const f=NFACE[i];
-    const tx=_fp[0]+_fN[0]*f*STEM_LEN, ty=_fp[1]+_fN[1]*f*STEM_LEN, tz=_fp[2]+_fN[2]*f*STEM_LEN;
-    project(_fp[0],_fp[1],_fp[2],_pb); project(tx,ty,tz,_pt);
-    let dx=_pt[0]-_pb[0], dy=_pt[1]-_pb[1];
-    const dl=Math.hypot(dx,dy)||1; dx/=dl; dy/=dl;
-    const off=14+NODE_R*NSIZE[i]*pxu;                // placed past the bead, along the stem axis
-    L.root.style.left=Math.round(_pt[0]+dx*off)+"px";
-    L.root.style.top =Math.round(_pt[1]+dy*off)+"px";
-    L.h.textContent=LABELS[i].h;
-    const chars=RM?99:Math.max(0,Math.floor((elapsed-s*DRAW_DUR)*TYPE_CPS));
-    L.m.textContent=LABELS[i].m.slice(0,chars);
-    // front face = readable, back face = muted (follows the ribbon rotation)
-    const facing=Math.max(0,Math.min(1,_fN[2]*f*1.6+0.55));
-    const hit=sig&&sig.activeNode===i&&sig.intensity>0.3;
-    L.root.style.opacity=((hit?1:0.30+0.55*facing)*reveal).toFixed(3);
-    L.root.classList.toggle("hit",hit);
-  }
-}
-
-/* title typed letter by letter, once the ribbon is drawn */
 function typeTitle(){
   let i=0;
   (function step(){
-    titleEl.textContent=WORD.slice(0,i);
-    if(i<WORD.length){ i++; typeTimer=setTimeout(step,95); }
-    else titleEl.classList.add("typed");
+    titleEl.textContent=WORD.slice(0,++i);
+    if(i<WORD.length)typeTimer=setTimeout(step,85);
+    else typeTimer=setTimeout(()=>titleEl.classList.add("typed"),900);
   })();
 }
-
-/* ── lifecycle: start/stop driven by the view visibility ── */
-let running=false, rafId=0, t0=0, typeTimer=null;
-function loop(now){
-  if(!running)return;
-  const el=(now-t0)/1000, sig=computeSig(el);
-  updateSearchBar(sig); render(el,sig); updateLabels(el,sig);
-  rafId=requestAnimationFrame(loop);
-}
 function start(){
+  // every visit replays the whole sequence: title, left column, then the thread
+  userTook=false; demoTyping=false; wq.value=""; maskOff=false; strokeG.setAttribute("mask","url(#reveal)");
+  document.querySelectorAll("#view-welcome .w-fade").forEach(el=>{ el.style.animationName="none"; void el.offsetWidth; el.style.animationName=""; });
   titleEl.textContent=""; titleEl.classList.remove("typed");
-  clearTimeout(typeTimer); typeTimer=setTimeout(typeTitle,(DRAW_DUR+0.25)*1000);
-  t0=performance.now(); rafId=requestAnimationFrame(loop);
+  clearTimeout(typeTimer);
+  if(RM){ titleEl.textContent=WORD; titleEl.classList.add("typed"); frame(0); return; }
+  typeTimer=setTimeout(typeTitle,300);
+  t0=performance.now(); rafId=requestAnimationFrame(frame);
 }
-function staticFrame(){                              // reduced-motion: final frame, frozen
-  const sig={visible:true,text:"auth bug",activeNode:3,intensity:1,pingT:-1};
-  render(DRAW_DUR,sig); updateSearchBar(sig); updateLabels(DRAW_DUR,sig);
-  titleEl.textContent=WORD; titleEl.classList.add("typed");
-}
-window.addEventListener("resize",function(){
-  if(!document.body.classList.contains("welcome"))return;
-  resize(); if(RM)staticFrame();
-});
 window.__heroSetActive=function(on){
-  if(on){ resize(); if(RM)staticFrame(); else if(!running){running=true;start();} }
-  else if(running){ running=false; cancelAnimationFrame(rafId); clearTimeout(typeTimer); }
+  if(on&&!running){ running=true; start(); }
+  else if(!on&&running){ running=false; cancelAnimationFrame(rafId); clearTimeout(typeTimer); }
 };
 })();
 
