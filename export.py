@@ -198,6 +198,10 @@ def parse(path):
         if o.get("type") == "ai-title" and o.get("aiTitle"):
             page_title = o["aiTitle"]
 
+    # Session date = last activity recorded in the JSONL: the file mtime is reset
+    # to "now" by a clone, a copy or a restore.
+    stamps = [t for t in (parse_ts(o.get("timestamp")) for o in raw) if t is not None]
+
     # Session working directory: `claude --resume` is scoped to the cwd, the id alone is not enough.
     # The encoded project folder name is lossy (ambiguous dashes); only this field gives the real path.
     cwd = ""
@@ -266,8 +270,18 @@ def parse(path):
     return {
         "title": page_title or "Claude Code conversation",
         "cwd": cwd,
+        "ts": max(stamps) if stamps else None,
         "sections": [s for s in sections if s["blocks"] or s["prompt"]],
     }
+
+
+def parse_ts(s):
+    """ISO 8601 -> epoch seconds, None if absent or malformed."""
+    try:
+        # fromisoformat only accepts the "Z" suffix from Python 3.11 on
+        return datetime.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+    except (AttributeError, TypeError, ValueError):
+        return None
 
 # ─────────────────────────── Tool formatting ───────────────────────────
 
@@ -2552,7 +2566,8 @@ def main():
         if not data["sections"]:
             skipped += 1
             continue
-        mtime = os.path.getmtime(path)
+        # Kept under the "mtime" key the JS sorts on; files without timestamps fall back to disk time
+        mtime = data["ts"] or os.path.getmtime(path)
         date_str = datetime.datetime.fromtimestamp(mtime).strftime("%d %b %Y, %H:%M")
         inner = render_session_inner(data, date_str)
         write_session_file(out_dir, sid, {

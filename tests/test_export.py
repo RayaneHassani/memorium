@@ -47,5 +47,31 @@ class DemoExportTest(unittest.TestCase):
         self.assertIn("401", search)
 
 
+class SessionDateTest(unittest.TestCase):
+    def _session(self, lines):
+        fd, path = tempfile.mkstemp(suffix=".jsonl")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        self.addCleanup(os.remove, path)
+        return path
+
+    def test_date_is_last_jsonl_timestamp(self):
+        path = self._session([
+            '{"type": "user", "timestamp": "2026-08-01T09:00:00.000Z", "message": {"content": "hi"}}',
+            '{"type": "user", "timestamp": "2026-08-03T18:30:00.000Z", "message": {"content": "again"}}',
+        ])
+        expected = export.parse_ts("2026-08-03T18:30:00.000Z")
+        self.assertEqual(export.parse(path)["ts"], expected)
+        self.assertEqual(expected, 1785781800.0)  # UTC, independent of the local timezone
+
+    def test_no_timestamp_gives_none(self):
+        path = self._session(['{"type": "user", "message": {"content": "hi"}}'])
+        self.assertIsNone(export.parse(path)["ts"])
+
+    def test_malformed_timestamp_is_ignored(self):
+        for bad in (None, 42, "", "yesterday"):
+            self.assertIsNone(export.parse_ts(bad))
+
+
 if __name__ == "__main__":
     unittest.main()
