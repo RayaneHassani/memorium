@@ -19,7 +19,7 @@ Claude Code stores every session as raw JSONL under `~/.claude/projects`. That's
 - **Full-text search** across every session, prebuilt at export time (`searchindex.js`).
 - **Highlight & annotate** — select any passage, highlight in five colors, attach a comment. Persisted in `localStorage`.
 - **Logical organization** — rename sessions and folders, move sessions between folders. Stored in a derived metadata layer (`data/metadata.json`) that **never touches** the source JSONL.
-- **Offline-first** — system font stack, no web fonts, no CDN, no network calls. Open it on a plane.
+- **Offline-first** — fonts are embedded in the page (Fraunces, Atkinson Hyperlegible Next, JetBrains Mono, under the [SIL Open Font License](OFL.txt)): no CDN, no network calls. Open it on a plane.
 
 ## Design principle: never mutate the source
 
