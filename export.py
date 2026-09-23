@@ -989,7 +989,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .sresult .sr-snip mark{background:var(--hl4);color:inherit;padding:0 1px;border-radius:var(--r-1);}
 
   /* ═══════ Find-bar (occurrences dans la session) ═══════ */
-  mark.find{background:var(--find);color:inherit;border-radius:var(--r-1);padding:.02em 0;
+  mark.find{background:var(--find);color:var(--ink);border-radius:var(--r-1);padding:.02em 0;
     box-decoration-break:clone;-webkit-box-decoration-break:clone;}
   mark.find.cur{background:var(--accent);color:var(--white);}
   #findbar{position:fixed;left:320px;bottom:22px;z-index:78;display:none;align-items:center;gap:6px;
@@ -1272,7 +1272,7 @@ function setView(v){
   const reading = (v==="read" && curSid);
   document.getElementById("cbtn").style.display = reading?"flex":"none";
   document.getElementById("pager").style.display = reading?"flex":"none";
-  if(v!=="read"){document.getElementById("recap").classList.remove("open");hideBar();closeNote();}
+  if(v!=="read"){document.getElementById("recap").classList.remove("open");hideBar();closeNote();closeFind();}
   if(v==="dash")buildDashboard();
   if(v==="organize")buildOrganize();
   window.scrollTo({top:0});
