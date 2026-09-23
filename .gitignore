@@ -16,3 +16,6 @@ export/
 SUIVI.md
 *-proto.html
 *.png
+
+# Video rushes and renders: large binaries, published through GitHub uploads, never committed
+marketing/**/*.mp4
