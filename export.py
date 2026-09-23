@@ -586,7 +586,7 @@ def render_session_inner(data, date_str):
 # ─────────────────────────── Template (inline CSS) ───────────────────────────
 
 INDEX_TEMPLATE = r"""<!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -867,7 +867,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .ask .q-answer{padding:9px 16px;font-size:var(--fs-2);color:var(--muted);border-top:1px solid var(--line);white-space:pre-wrap;}
   .interrupt{font-size:var(--fs-2);color:var(--accent-d);background:#FBEFEA;border-radius:var(--r-2);padding:5px 11px;margin:10px 0;display:inline-block;}
 
-  mark.hl{background:var(--c,var(--hl1));color:inherit;border-radius:var(--r-1);padding:.02em 0;box-decoration-break:clone;-webkit-box-decoration-break:clone;cursor:pointer;}
+  mark.hl{background:var(--c,var(--hl1));color:inherit;border-radius:0;padding:.14em 0;cursor:pointer;}
   mark.hl.has-note{border-bottom:2px solid var(--accent);}
   mark.hl.flash{animation:flash 1.1s ease;}
   @keyframes flash{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--accent2-l)}}
@@ -1068,7 +1068,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <section id="view-read" class="view">
   <div class="layout">
     <aside id="sidebar">
-      <div id="side-resizer" title="Glisser pour redimensionner"></div>
+      <div id="side-resizer" title="Drag to resize"></div>
       <div id="side-inner">
         <input id="search" placeholder="Search for a word or a phrase…" autocomplete="off">
         <div id="sesslist"></div>
@@ -1165,8 +1165,8 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <div id="seltools"></div>
 <div id="notepop">
   <div class="swatches" id="note-swatches"></div>
-  <textarea id="note-text" placeholder="Votre commentaire (facultatif)…"></textarea>
-  <div class="row"><button class="del" id="note-del">Retirer</button><button class="save" id="note-save">Enregistrer</button></div>
+  <textarea id="note-text" placeholder="Your comment (optional)…"></textarea>
+  <div class="row"><button class="del" id="note-del">Remove</button><button class="save" id="note-save">Save</button></div>
 </div>
 <button id="cbtn">Commentaires <span class="badge" id="cbadge">0</span></button>
 <aside id="recap">
@@ -1992,7 +1992,7 @@ def write_session_file(out_dir, sid, payload):
 _TAG_RE = re.compile(r"<[^>]+>")
 
 def plain_text(html_str):
-    """Texte brut minuscule d'un HTML rendu (pour l'index de recherche plein-texte)."""
+    """Lower-case plain text of rendered HTML (for the full-text search index)."""
     t = _TAG_RE.sub(" ", html_str)
     t = html.unescape(t)
     return re.sub(r"\s+", " ", t).strip().lower()
