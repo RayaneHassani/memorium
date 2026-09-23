@@ -669,17 +669,26 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .dash-hero .brand-svg{width:66px;height:auto;margin-right:16px;}
   .dash-hero p{color:var(--muted);font-size:var(--fs-3);margin:0;}
   .dash-hero .accent-rule{height:3px;width:64px;background:var(--accent);margin:22px auto 0;border-radius:var(--r-1);}
-  .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:18px;
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;
     max-width:1080px;margin:0 auto;padding:18px 24px 90px;}
-  .pcard{background:var(--white);border:1px solid var(--line);border-radius:var(--r-3);padding:18px 18px 16px;cursor:pointer;
-    transition:transform .13s,box-shadow .13s,border-color .13s;position:relative;overflow:hidden;}
+  .pcard{position:relative;overflow:hidden;background:var(--white);border:1px solid var(--line);border-radius:var(--r-3);
+    padding:18px 18px 14px 22px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;}
   .pcard:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);opacity:.85;}
-  .pcard:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.09);border-color:var(--accent);}
-  .pcard .pname{font-weight:700;font-size:var(--fs-5);margin:0 0 12px;padding-left:8px;line-height:1.3;word-break:break-word;}
-  .pcard .pstats{display:flex;gap:16px;padding-left:8px;font-size:var(--fs-2);color:var(--muted);}
-  .pcard .pstats b{color:var(--ink);font-size:var(--fs-6);font-weight:700;display:block;}
-  .pcard .pnotes{position:absolute;top:14px;right:14px;background:var(--accent2);color:var(--white);font-size:var(--fs-1);
-    border-radius:var(--r-pill);padding:2px 9px;font-weight:700;}
+  .pcard:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(86,99,64,.14);border-color:var(--accent);}
+  .pcard .pname{font-family:var(--display);font-weight:600;font-size:var(--fs-6);line-height:1.2;letter-spacing:-.01em;word-break:break-word;}
+  /* weekly activity: one bar per week, same scale on every card so projects compare */
+  .pspark{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;align-items:end;height:30px;margin:14px 0 4px;}
+  .pspark i{display:block;background:var(--accent2-l);border-radius:2px 2px 0 0;min-height:2px;}
+  .pspark i.on{background:var(--accent2);}
+  .pspark i.now{background:var(--accent-d);}
+  .paxis{display:flex;justify-content:space-between;font:var(--fs-1)/1 var(--mono);color:var(--muted);opacity:.75;margin-bottom:12px;}
+  .psrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:7px 8px;margin:0 -8px;border-radius:var(--r-1);}
+  .psrow .t{font-size:var(--fs-3);font-weight:500;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .psrow .d{font:var(--fs-2)/1 var(--mono);color:var(--muted);}
+  .psrow:hover{background:rgba(142,156,99,.13);}
+  .psrow:hover .t{color:var(--accent-d);}
+  .pmore{font-size:var(--fs-2);color:var(--muted);padding:6px 0 0;}
+  .pfoot{border-top:1px solid var(--line);margin-top:12px;padding-top:11px;font:var(--fs-2)/1 var(--mono);color:var(--muted);}
 
   /* ───── Organize ───── */
   .ed-wrap{max-width:880px;margin:0 auto;padding:34px 24px 110px;}
@@ -1281,19 +1290,34 @@ function projectGroups(){
   MANIFEST.forEach(m=>{const f=effFolder(m);(g[f]=g[f]||[]).push(m);});
   return g;
 }
+const WEEK_MS=7*864e5, WEEKS=12;
 function buildDashboard(){
   const g=projectGroups();
   const order=Object.keys(g).sort((a,b)=>Math.max(...g[b].map(s=>s.mtime))-Math.max(...g[a].map(s=>s.mtime)));
+  const now=Date.now(), bins={};
+  order.forEach(proj=>{
+    const b=new Array(WEEKS).fill(0);
+    g[proj].forEach(s=>{const k=WEEKS-1-Math.floor((now-s.mtime*1000)/WEEK_MS); if(k>=0&&k<WEEKS)b[k]++;});
+    bins[proj]=b;
+  });
+  const peak=Math.max(1,...order.map(p=>Math.max(...bins[p])));
   const grid=document.getElementById("dash-grid"); grid.innerHTML="";
   order.forEach(proj=>{
-    const sess=g[proj];
-    const prompts=sess.reduce((t,s)=>t+(s.prompts||0),0);
-    const notes=sess.reduce((t,s)=>t+countNotes(s.sid),0);
+    const sess=g[proj].slice().sort((a,b)=>b.mtime-a.mtime);
+    const bars=bins[proj].map((n,k)=>'<i class="'+(n?"on":"")+(k===WEEKS-1&&n?" now":"")+'" style="height:'+
+      (n?Math.max(18,100*n/peak):7)+'%" title="'+n+' session'+(n===1?"":"s")+'"></i>').join("");
+    const rows=sess.slice(0,3).map(m=>'<div class="psrow" data-sid="'+m.sid+'"><span class="t">'+esc(effTitle(m))+
+      '</span><span class="d">'+m.date.slice(0,6)+'</span></div>').join("");
     const c=document.createElement("div"); c.className="pcard";
     c.innerHTML='<div class="pname">'+esc(folderName(proj))+'</div>'+
-      '<div class="pstats"><div><b>'+sess.length+'</b>sessions</div><div><b>'+prompts+'</b>prompts</div></div>'+
-      (notes?'<div class="pnotes">'+notes+' ✎</div>':'');
-    c.onclick=()=>openProject(proj);
+      '<div class="pspark">'+bars+'</div><div class="paxis"><span>12 weeks</span><span>now</span></div>'+
+      rows+(sess.length>3?'<div class="pmore">+ '+(sess.length-3)+' more</div>':'')+
+      '<div class="pfoot">'+sess.length+' session'+(sess.length===1?"":"s")+'</div>';
+    c.onclick=e=>{                                 // a title opens its session, the rest of the card the project
+      const row=e.target.closest(".psrow");
+      if(row){curProject=proj; setView("read"); buildSidebar(""); openSession(row.dataset.sid);}
+      else openProject(proj);
+    };
     grid.appendChild(c);
   });
 }
