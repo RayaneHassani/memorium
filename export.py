@@ -757,6 +757,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .sess.active .st{color:var(--ink);font-weight:600;}
   .sess .sm{font-size:var(--fs-2);color:var(--muted);margin-top:3px;display:flex;gap:8px;}
   .sess .sm .pr{color:var(--accent2);}
+  .sess .sm .nn{color:var(--accent);}
   .sess-toc{list-style:none;margin:4px 0 2px;padding:0 0 0 6px;border-left:1px dashed var(--line);}
   .sess-toc a{display:flex;gap:8px;align-items:baseline;padding:3px 8px;border-radius:var(--r-2);color:var(--muted);
     text-decoration:none;font-size:var(--fs-2);}
@@ -1163,7 +1164,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   <textarea id="note-text" placeholder="Your comment (optional)…"></textarea>
   <div class="row"><button class="del" id="note-del">Remove</button><button class="save" id="note-save">Save</button></div>
 </div>
-<button id="cbtn">Commentaires <span class="badge" id="cbadge">0</span></button>
+<button id="cbtn">Comments <span class="badge" id="cbadge">0</span></button>
 <aside id="recap">
   <header><h2>Commentaires (<span id="recap-count">0</span>)</h2><button class="close" id="recap-close">×</button></header>
   <div id="recap-list"></div>
@@ -1449,7 +1450,7 @@ function buildSidebar(filter){
     sess.forEach(m=>{
       const el=document.createElement("div"); el.className="sess"; el.dataset.sid=m.sid;
       const nn=countNotes(m.sid);
-      el.innerHTML='<div class="st">'+esc(effTitle(m))+'</div><div class="sm"><span class="pr">'+m.prompts+' prompts</span><span>'+m.date+'</span>'+(nn?'<span style="color:var(--accent)">'+nn+'✎</span>':'')+'</div>';
+      el.innerHTML='<div class="st">'+esc(effTitle(m))+'</div><div class="sm"><span class="pr">'+m.prompts+' prompts</span><span>'+m.date+'</span>'+(nn?'<span class="nn">'+nn+'✎</span>':'')+'</div>';
       el.onclick=()=>openSession(m.sid);
       wrap.appendChild(el);
     });
@@ -1632,11 +1633,22 @@ document.getElementById("note-del").onclick=()=>{
 document.addEventListener("click",e=>{
   const m=e.target.closest("mark.hl");
   if(m){openNote(m.dataset.aid);return;}
-  if(!e.target.closest("#notepop")&&!e.target.closest("#seltools"))closeNote();
+  if(!e.target.closest("#notepop")&&!e.target.closest("#seltools")&&!e.target.closest(".cmt-card"))closeNote();
 });
 
 /* ───── Gutter + recap ───── */
-function refresh(){reflow();buildRecap();}
+function refresh(){reflow();buildRecap();syncNoteBadges();}
+function syncNoteBadges(){                       // sidebar ✎ counts follow note edits without a rebuild (keeps scroll and folds)
+  const el=document.querySelector('.sess[data-sid="'+curSid+'"]'); if(!el)return;
+  const nn=anns.filter(a=>a.note).length, sm=el.querySelector(".sm");
+  let b=sm.querySelector(".nn");
+  if(nn&&!b){b=document.createElement("span");b.className="nn";sm.appendChild(b);}
+  if(b){if(nn)b.textContent=nn+"✎";else b.remove();}
+  const pd=el.closest(".proj"); if(!pd)return;
+  const sids=[...pd.querySelectorAll(".sess")].map(x=>x.dataset.sid);
+  const total=sids.reduce((t,sid)=>t+countNotes(sid),0);
+  pd.querySelector(".pc").textContent=sids.length+" sess"+(total?" · "+total+"✎":"");
+}
 function reflow(){
   viewer.querySelectorAll(".exchange").forEach(ex=>{
     const g=ex.querySelector(".gutter"); if(!g)return; g.innerHTML="";
