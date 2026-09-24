@@ -1,0 +1,5 @@
+{"type": "ai-title", "aiTitle": "Rotate the application logs"}
+{"type": "user", "message": {"content": "Set up logrotate for the app logs, keep seven days."}, "timestamp": "2026-08-10T09:00:00.000Z", "cwd": "/home/dev/alpha"}
+{"type": "assistant", "message": {"content": [{"type": "text", "text": "Let me check where the logs are written first."}, {"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "ls /var/log/alpha"}}]}, "timestamp": "2026-08-10T09:00:20.000Z", "cwd": "/home/dev/alpha"}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "app.log\nerror.log", "is_error": false}]}, "timestamp": "2026-08-10T09:00:30.000Z", "cwd": "/home/dev/alpha"}
+{"type": "assistant", "message": {"content": [{"type": "text", "text": "Two files. A daily logrotate rule with `rotate 7` and `compress` covers both."}]}, "timestamp": "2026-08-10T09:01:00.000Z", "cwd": "/home/dev/alpha"}

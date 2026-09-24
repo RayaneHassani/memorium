@@ -21,7 +21,7 @@ Usage:
 
 import sys, os, json, re, html, glob, gzip, shutil, webbrowser, datetime
 
-# Session source: ~/.claude/projects by default, overridable (demo, tests, CI)
+# Session source: ~/.claude/projects by default, overridable (tests, CI)
 PROJECTS_DIR = os.environ.get("MEMORIUM_PROJECTS_DIR") or os.path.join(os.path.expanduser("~"), ".claude", "projects")
 
 # Raw JSONL archive: outside ~/.claude, which Claude Code prunes past cleanupPeriodDays.

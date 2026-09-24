@@ -15,6 +15,7 @@ export/
 # Personal working notes & design WIP
 SUIVI.md
 *-proto.html
+demo/
 *.png
 
 # Video rushes and renders: large binaries, published through GitHub uploads, never committed
