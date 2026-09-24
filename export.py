@@ -730,7 +730,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 
   .layout{display:grid;grid-template-columns:var(--side-w,300px) 1fr;}
 
-  /* ───── Sidebar : projets → sessions ───── */
+  /* ───── Sidebar: projects → sessions ───── */
   aside#sidebar{position:sticky;top:var(--nav-h);align-self:start;height:calc(100vh - var(--nav-h));overflow:hidden;
     background:var(--panel);border-right:1px solid var(--line);}
   #side-inner{height:100%;overflow-y:auto;padding:18px 16px 60px;}
@@ -765,7 +765,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
   .sess-toc a:hover{background:var(--paper-2);color:var(--ink);}
   .sess-toc a.active{color:var(--ink);font-weight:600;}
 
-  /* ───── Zone principale (lecture) ───── */
+  /* ───── Main area (reading) ───── */
   main{padding:0 0 200px;min-height:calc(100vh - var(--nav-h));position:relative;}
   #emptyread{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - var(--nav-h));
     text-align:center;color:var(--muted);padding:40px;}
@@ -917,11 +917,11 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     #findbar{left:12px;right:12px;bottom:12px;}
   }
 
-  /* ═══════ Transitions entre vues ═══════ */
+  /* ═══════ View transitions ═══════ */
   .view.active{animation:viewIn .42s cubic-bezier(.22,.7,.2,1) both;}
   @keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
-  /* ═══════ Tableaux — rendus lisibles (fini les pipes bruts) ═══════ */
+  /* ═══════ Tables, rendered readable (no more raw pipes) ═══════ */
   .tbl-wrap{overflow-x:auto;margin:13px 0;border:1px solid var(--line);border-radius:var(--r-2);}
   .tbl-wrap table{border-collapse:collapse;width:100%;font-size:var(--fs-3);line-height:var(--lh-ui);}
   .tbl-wrap th,.tbl-wrap td{padding:7px 13px;border-bottom:1px solid var(--line);
@@ -988,7 +988,7 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
   .sresult .sr-snip mark{background:var(--hl4);color:inherit;padding:0 1px;border-radius:var(--r-1);}
 
-  /* ═══════ Find-bar (occurrences dans la session) ═══════ */
+  /* ═══════ Find bar (matches in the open session) ═══════ */
   mark.find{background:var(--find);color:var(--ink);border-radius:var(--r-1);padding:.02em 0;
     box-decoration-break:clone;-webkit-box-decoration-break:clone;}
   mark.find.cur{background:var(--accent);color:var(--white);}
@@ -1202,12 +1202,12 @@ function countAnns(sid){return loadAnns(sid).length;}
 function uid(){return "a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function metaOf(sid){return MANIFEST.find(m=>m.sid===sid);}
 
-/* Accessors : titre/dossier effectifs = override metadata sinon valeur d'origine */
+/* Accessors: effective title/folder = metadata override, else the original value */
 function effTitle(m){const o=META.sessions[m.sid];return (o&&o.title)||m.title;}
 function effFolder(m){const o=META.sessions[m.sid];return (o&&o.folder)||m.project;}
 function folderName(id){const f=META.folders[id];return (f&&f.name)||id;}
 
-/* ───── Store disque (File System Access API) ───── */
+/* ───── Disk store (File System Access API) ───── */
 const DB_NAME="memorium-store", STORE="handles", HKEY="rootDir";
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);
   r.onupgradeneeded=()=>r.result.createObjectStore(STORE);
@@ -1215,8 +1215,8 @@ function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);
 async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE).objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
 async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put(v,k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});}
 
-let rootDir=null;                              // handle du dossier export/
-const FS_OK=("showDirectoryPicker" in window); // faux sur Firefox/Safari
+let rootDir=null;                              // handle of the export/ folder
+const FS_OK=("showDirectoryPicker" in window); // false on Firefox/Safari
 
 async function connectDir(){
   if(!FS_OK){alert("Disk writing is not supported — use Chrome or Edge.");return false;}
@@ -1263,7 +1263,7 @@ function updateDirPill(){
        el.onclick=async()=>{(await idbGet(HKEY))?reconnectDir():connectDir();};}
 }
 
-/* ───── Navigation entre vues ───── */
+/* ───── View navigation ───── */
 function setView(v){
   curView=v;
   if(window.__heroSetActive)window.__heroSetActive(v==="welcome");
@@ -1325,7 +1325,7 @@ function openProject(proj){
   if(sess.length)openSession(sess[0].sid);
 }
 
-/* ───── Organize : dossiers & sessions (couche metadata.json) ───── */
+/* ───── Organize: folders & sessions (metadata.json layer) ───── */
 async function saveMeta(){
   if(!rootDir){alert("Connect the export folder first (pill in the top right).");return false;}
   try{await writeData("metadata.json",JSON.stringify(META,null,2));return true;}
@@ -1375,7 +1375,7 @@ function buildOrganize(){
       META.folders[id]=Object.assign(META.folders[id]||{},{name:v}); if(await saveMeta())refreshAll();};
     head.appendChild(nameIn);
     const cnt=document.createElement("span"); cnt.className="ed-fcount"; cnt.textContent=sess.length+" sess"; head.appendChild(cnt);
-    if(sess.length===0){                          // suppression permise seulement si le dossier est vide
+    if(sess.length===0){                          // deleting is allowed only when the folder is empty
       const del=document.createElement("button"); del.className="ed-del"; del.textContent="✕";
       del.title=custom?"Delete this folder":"Remove this empty folder from the list";
       del.onclick=async()=>{
@@ -1460,7 +1460,7 @@ function buildSidebar(filter){
   });
 }
 
-/* ───── Chargement paresseux ───── */
+/* ───── Lazy loading ───── */
 window.__loadSession=function(sid,payload){cache[sid]=payload; if(pendingSid===sid)mount(sid);};
 function copyText(t){                            // navigator.clipboard requires a secure context: missing on file://
   if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(t);
@@ -1543,7 +1543,7 @@ function applyAllAnns(){
   });
 }
 
-/* ───── Surlignage / annotations ───── */
+/* ───── Highlights / annotations ───── */
 function textNodes(el){const o=[],w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null);let n;while(n=w.nextNode())o.push(n);return o;}
 function offsetOf(cont,node,off){let t=0;for(const tn of textNodes(cont)){if(tn===node)return t+off;t+=tn.nodeValue.length;}return t;}
 function applyAnn(cont,a){
@@ -1687,7 +1687,7 @@ const recap=document.getElementById("recap");
 document.getElementById("cbtn").onclick=()=>recap.classList.toggle("open");
 document.getElementById("recap-close").onclick=()=>recap.classList.remove("open");
 
-/* ───── Pager (prompts de la session courante) ───── */
+/* ───── Pager (prompts of the current session) ───── */
 let secs=[], cur=0, sobs=null;
 function setCur(i){cur=i;document.getElementById("pcur").textContent=String(i+1).padStart(2,"0");
   document.querySelectorAll(".sess-toc a").forEach(l=>l.classList.remove("active"));
@@ -1711,7 +1711,7 @@ document.addEventListener("keydown",e=>{
   if(e.key==="k"||e.key==="ArrowUp"){e.preventDefault();go(-1);}
 });
 
-/* ───── Recherche plein-texte ───── */
+/* ───── Full-text search ───── */
 let pendingFind=null, findHits=[], findIdx=-1;
 function searchData(){return window.__SEARCH||{};}
 function reEsc(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
@@ -1753,7 +1753,7 @@ function buildResults(q){
     list.appendChild(d);
   });
 }
-/* Surlignage des occurrences dans la session ouverte */
+/* Highlight the matches in the open session */
 function runFind(q){
   closeFind();
   const ql=(q||"").toLowerCase(); if(ql.length<2)return;
