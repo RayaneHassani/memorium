@@ -1,15 +1,38 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]  # PEP 639 license expression and license-files
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "memorium"
+name = "memorium-cli"
 version = "1.0.0"
-description = "Claude Code sessions → a readable, searchable & annotatable HTML memory"
+description = "Your reasoning, kept. A forensic journal of every Claude Code session."
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = []          # pur stdlib — rien à résoudre
-authors = [{ name = "Rayane" }]
+dependencies = []          # standard library only
+authors = [{ name = "Rayane Hassani" }]
+license = "MIT"
+license-files = ["LICENSE", "OFL.txt"]
+keywords = ["claude-code", "claude", "llm", "session", "journal", "static-site", "cli"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Utilities",
+    "Topic :: Text Processing :: Markup :: HTML",
+]
+
+[project.urls]
+Homepage = "https://github.com/RayaneHassani/memorium"
+Repository = "https://github.com/RayaneHassani/memorium"
+Issues = "https://github.com/RayaneHassani/memorium/issues"
 
 [project.scripts]
 memorium = "export:main"
