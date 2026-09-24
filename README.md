@@ -1,79 +1,77 @@
+<p align="center">
+  <img src="docs/assets/banner.svg" width="800" alt="Memorium — Your reasoning, kept.">
+</p>
+
 # Memorium
 
-Turn your **Claude Code** sessions (`~/.claude/projects/*.jsonl`) into a clean, searchable HTML journal — read past conversations, full-text search across all of them, and highlight and annotate passages. Pure Python **standard library**, a single file, **zero dependencies**.
+**Your reasoning, kept.** A forensic journal of every Claude Code session.
+
+Six months from now, the commit will say *what* changed. Memorium shows you *why*: the session where the trade-off was weighed, the benchmark that settled it, the dead end you already tried.
 
 [![CI](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml/badge.svg)](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml)
-![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-3776AB?logo=python&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Dependencies: none](https://img.shields.io/badge/dependencies-0-brightgreen)
-![Pure stdlib](https://img.shields.io/badge/pure-stdlib-informational)
-![Offline](https://img.shields.io/badge/offline-first-blueviolet)
+[![License: MIT](https://img.shields.io/badge/license-MIT-566340)](LICENSE)
 
-## Why
+- **Find the why.** Full-text search across every session you ever ran, prebuilt at export time. Type `postgres`, land on the session where you chose it.
+- **Keep it.** Claude Code deletes sessions after 30 days. Memorium archives the raw logs the moment a session ends and restores them so `claude --resume` works again.
+- **Make it yours.** Highlight, comment, rename and regroup sessions. Your source logs are never touched.
 
-Claude Code stores every session as raw JSONL under `~/.claude/projects`. That's great for tooling, useless for humans: you can't skim what you did last week, find that one command, or keep notes on a design decision. Memorium renders those logs into a static site you actually want to open — no server, no database, no build toolchain.
+## Quick start
+
+```bash
+pipx install git+https://github.com/RayaneHassani/memorium
+memorium          # reads ~/.claude/projects, writes ./export, opens the browser
+memorium init     # once: stop the 30-day purge and archive every session as it ends
+```
+
+No server, no database, no account. One Python file, standard library only, and a static site you can open anywhere, even on a plane.
 
 ## Features
 
-- **Readable transcripts** — prompts, responses, tool calls and terminal output, laid out for long-form reading.
-- **Full-text search** across every session, prebuilt at export time (`searchindex.js`).
-- **Highlight & annotate** — select any passage, highlight in five colors, attach a comment. Persisted in `localStorage`.
-- **Logical organization** — rename sessions and folders, move sessions between folders. Stored in a derived metadata layer (`data/metadata.json`) that **never touches** the source JSONL.
-- **Offline-first** — fonts are embedded in the page (Fraunces, Atkinson Hyperlegible Next, JetBrains Mono, under the [SIL Open Font License](OFL.txt)): no CDN, no network calls. Open it on a plane.
+- **Readable transcripts.** Prompts, answers, tool calls and terminal output, typeset for long-form reading.
+- **Full-text search** across every session, from a search index built once at export.
+- **Highlights and comments** in five colours, with a margin view and a per-session recap.
+- **Logical organization.** Rename sessions and folders, move sessions between folders.
+- **A dashboard that remembers.** Weekly activity and the latest sessions of every project.
+- **Offline by design.** Fonts are embedded in the page, nothing is fetched from the network.
 
-## Design principle: never mutate the source
+## How it works
 
-`~/.claude/projects` is owned by Claude Code and indexed by its tooling. Renaming a folder or moving a `.jsonl` file would break that indexing. So every rename and move here is **logical only** — recorded in a separate `metadata.json` and resolved at display time. The source of truth stays untouched and every change is reversible. This is the core architectural trade-off, chosen deliberately over physically reorganizing files.
+`~/.claude/projects` belongs to Claude Code, which indexes it. Renaming a folder or moving a `.jsonl` file there would break `claude --resume`. So every rename and move in Memorium is **logical only**: it is recorded in a separate `export/data/metadata.json` and resolved at display time. The source of truth is never mutated, and every change is reversible. This is the core architectural trade-off, chosen deliberately over reorganizing files on disk.
 
-Writing that metadata requires the browser's **File System Access API**, which is disabled on `file://` pages. That's why write features run through `memorium serve`, which serves the export over `http://localhost` — a *secure context* — with a dumb static file server and no business logic on the server side.
+Writing that metadata needs the browser's File System Access API, which is disabled on `file://` pages. `memorium serve` serves the export over `http://localhost`, a *secure context*, with a plain static file server and no logic on the server side. Read-only browsing works from `file://` in any browser; annotations and organization need `memorium serve` and a Chromium browser (Chrome, Edge, Brave).
 
-## Install
+## Archive and restore
 
-With [pipx](https://pipx.pypa.io) (isolated global CLI):
+Claude Code silently deletes any session untouched for `cleanupPeriodDays`, **30 days by default**. `memorium init` raises that setting (after backing up your `settings.json`) and installs a `SessionEnd` hook that archives every session the moment it ends.
 
 ```bash
-pipx install .
-# or straight from git
-pipx install git+https://github.com/RayaneHassani/memorium
+memorium archive                      # gzip every raw session into ~/.memorium/archive, incremental
+memorium restore <id-prefix>          # put one back into ~/.claude/projects, so `claude --resume` works
+memorium restore <id-prefix> --force  # overwrite a session that diverged locally
 ```
 
-`memorium` is now a global command.
+`restore` also moves a session to another machine, or brings back one Claude Code has already purged. Set `MEMORIUM_ARCHIVE_DIR` to archive elsewhere.
 
-Without installing, via [uv](https://docs.astral.sh/uv/):
+To update, upgrade and re-run in the same output directory. Only the generated pages are rewritten; your `export/data/` is never touched.
 
 ```bash
-uvx --from git+https://github.com/RayaneHassani/memorium memorium
+pipx upgrade memorium-cli && memorium
 ```
 
-## Usage
+## By the numbers
+
+- **2,424 lines, one file, zero dependencies**: CLI, HTML generator, search index and viewer.
+- **61 sessions exported in 1.5 s** from a real multi-month history (718 raw log files scanned).
+- **241 KB** for the whole app shell, embedded fonts included.
+- **CI on Python 3.8 to 3.13** on every push: byte-compile and a smoke test on a fixture corpus.
+
+## Development
 
 ```bash
-memorium                  # read ~/.claude/projects, write ./export, open the browser
-memorium "D:\output"      # custom output directory
-memorium serve            # serve the export on http://localhost:8137 (unlocks write features)
-```
-
-Output: `export/index.html` + `export/sessions/*.js` + `export/searchindex.js`. Everything is static — copy the folder anywhere and open `index.html`.
-
-Read-only browsing works from `file://` in any browser. **Annotations and organization** need `memorium serve` and a Chromium browser (Chrome/Edge/Brave) for the File System Access API.
-
-## Updating
-
-Upgrade the tool, then re-run it in the same output directory:
-
-```bash
-pipx upgrade memorium
-memorium           # or: memorium serve
-```
-
-Re-running only rewrites the generated pages (`index.html`, `sessions/`, `searchindex.js`). Your `export/data/` — any renames or moves — is never touched. Highlights and comments live in the browser (`localStorage`), keyed to how you open the export; browse through `memorium serve` so they keep a stable location and survive updates.
-
-## Local development
-
-```bash
-python export.py         # equivalent to the installed command
+python export.py                    # same as the installed command
+python -m unittest discover -s tests
 ```
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). The embedded fonts (Fraunces, Atkinson Hyperlegible Next, JetBrains Mono) are under the SIL Open Font License, see [OFL.txt](OFL.txt).
