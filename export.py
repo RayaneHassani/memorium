@@ -19,7 +19,16 @@ Usage:
     python export.py        # same thing without installing
 """
 
-import sys, os, json, re, html, glob, gzip, shutil, webbrowser, datetime
+import datetime
+import glob
+import gzip
+import html
+import json
+import os
+import re
+import shutil
+import sys
+import webbrowser
 
 # Session source: ~/.claude/projects by default, overridable (tests, CI)
 PROJECTS_DIR = os.environ.get("MEMORIUM_PROJECTS_DIR") or os.path.join(os.path.expanduser("~"), ".claude", "projects")
@@ -58,7 +67,7 @@ def scan_meta(path):
 
 def clean_input(s):
     """Strip whitespace and BOM/zero-width characters (pipe artefacts) at both ends."""
-    return re.sub(r'^[\s﻿​]+|[\s﻿​]+$', '', s)
+    return re.sub(r'^[\s\ufeff\u200b]+|[\s\ufeff\u200b]+$', '', s)
 
 
 def discover_sessions(deep=50):
@@ -292,7 +301,7 @@ def basename(p):
     return os.path.basename(p) if p else "?"
 
 def count_lines(s):
-    return len([l for l in s.splitlines()]) if s else 0
+    return len(s.splitlines()) if s else 0
 
 
 def render_tool(b, results):
@@ -376,8 +385,12 @@ def md_to_html(text):
 
     def close_lists():
         nonlocal in_ul, in_ol
-        if in_ul: out.append("</ul>"); in_ul = False
-        if in_ol: out.append("</ol>"); in_ol = False
+        if in_ul:
+            out.append("</ul>")
+            in_ul = False
+        if in_ol:
+            out.append("</ol>")
+            in_ol = False
 
     while i < len(lines):
         ln = lines[i]
@@ -388,7 +401,8 @@ def md_to_html(text):
             buf = []
             i += 1
             while i < len(lines) and not lines[i].lstrip().startswith("```"):
-                buf.append(lines[i]); i += 1
+                buf.append(lines[i])
+                i += 1
             i += 1
             cls = f' class="lang-{esc(lang)}"' if lang else ""
             out.append(f'<pre class="code"><code{cls}>{esc(chr(10).join(buf))}</code></pre>')
@@ -400,20 +414,23 @@ def md_to_html(text):
             close_lists()
             def cells(row):
                 row = row.strip()
-                if row.startswith("|"): row = row[1:]
-                if row.endswith("|"): row = row[:-1]
+                if row.startswith("|"):
+                    row = row[1:]
+                if row.endswith("|"):
+                    row = row[:-1]
                 return [c.strip() for c in row.split("|")]
             aligns = []
             for spec in cells(lines[i + 1]):
-                l, r = spec.startswith(":"), spec.endswith(":")
-                aligns.append(' style="text-align:center"' if l and r
-                              else ' style="text-align:right"' if r
-                              else ' style="text-align:left"' if l else "")
+                left, right = spec.startswith(":"), spec.endswith(":")
+                aligns.append(' style="text-align:center"' if left and right
+                              else ' style="text-align:right"' if right
+                              else ' style="text-align:left"' if left else "")
             head = cells(ln)
             i += 2
             body = []
             while i < len(lines) and lines[i].strip() and "|" in lines[i]:
-                body.append(cells(lines[i])); i += 1
+                body.append(cells(lines[i]))
+                i += 1
             def row_html(tag, vals):
                 return "".join(
                     f"<{tag}{aligns[j] if j < len(aligns) else ''}>{inline_md(v)}</{tag}>"
@@ -428,33 +445,48 @@ def md_to_html(text):
             close_lists()
             lvl = min(len(m.group(1)) + 2, 6)  # shift down: # becomes h3 (h1/h2 belong to the page)
             out.append(f"<h{lvl}>{inline_md(m.group(2).strip())}</h{lvl}>")
-            i += 1; continue
+            i += 1
+            continue
         # blockquote
         if ln.startswith(">"):
             close_lists()
             buf = []
             while i < len(lines) and lines[i].startswith(">"):
-                buf.append(lines[i][1:].lstrip()); i += 1
+                buf.append(lines[i][1:].lstrip())
+                i += 1
             out.append(f"<blockquote>{inline_md(chr(10).join(buf))}</blockquote>")
             continue
         # ordered list
         m = re.match(r"^\s*\d+\.\s+(.*)$", ln)
         if m:
-            if not in_ol: close_lists(); out.append("<ol>"); in_ol = True
+            if not in_ol:
+                close_lists()
+                out.append("<ol>")
+                in_ol = True
             out.append(f"<li>{inline_md(m.group(1))}</li>")
-            i += 1; continue
+            i += 1
+            continue
         # bullet list
         m = re.match(r"^\s*[-*+]\s+(.*)$", ln)
         if m:
-            if not in_ul: close_lists(); out.append("<ul>"); in_ul = True
+            if not in_ul:
+                close_lists()
+                out.append("<ul>")
+                in_ul = True
             out.append(f"<li>{inline_md(m.group(1))}</li>")
-            i += 1; continue
+            i += 1
+            continue
         # horizontal rule
         if re.match(r"^\s*---+\s*$", ln):
-            close_lists(); out.append("<hr>"); i += 1; continue
+            close_lists()
+            out.append("<hr>")
+            i += 1
+            continue
         # blank line
         if not ln.strip():
-            close_lists(); i += 1; continue
+            close_lists()
+            i += 1
+            continue
         # paragraph (merges consecutive lines)
         close_lists()
         buf = [ln]
@@ -462,7 +494,8 @@ def md_to_html(text):
         while i < len(lines) and lines[i].strip() and not re.match(
             r"^(#{1,6}\s|>|\s*[-*+]\s|\s*\d+\.\s|```|\s*---+\s*$)", lines[i]
         ):
-            buf.append(lines[i]); i += 1
+            buf.append(lines[i])
+            i += 1
         out.append(f"<p>{inline_md(' '.join(buf))}</p>")
     close_lists()
     return "\n".join(out)
