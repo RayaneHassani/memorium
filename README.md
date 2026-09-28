@@ -12,6 +12,9 @@ Six months from now, the commit will say *what* changed. Memorium shows you *why
 [![License: MIT](https://img.shields.io/badge/license-MIT-566340)](https://github.com/RayaneHassani/memorium/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+## See it in action
+https://github.com/user-attachments/assets/bc92e37f-8ab9-45e2-a43d-f57990237f4b
+
 - **Find the why.** Full-text search across every session you ever ran, prebuilt at export time. Type `postgres`, land on the session where you chose it.
 - **Keep it.** Claude Code deletes sessions after 30 days. Memorium archives the raw logs the moment a session ends and restores them so `claude --resume` works again.
 - **Make it yours.** Highlight, comment, rename and regroup sessions. Your source logs are never touched.
