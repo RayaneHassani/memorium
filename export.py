@@ -15,7 +15,10 @@ Usage:
     memorium serve          # serve ./export at http://localhost:8137 (unlocks writing)
     memorium archive        # incremental gzip backup of the JSONL files outside ~/.claude
     memorium restore <id>   # put an archived session back where Claude Code looks for it
+                            #   --force overwrites a copy that diverged locally
     memorium init           # raise retention + install the archiving hook (with consent)
+                            #   --yes skips the confirmation
+    memorium --version      # print the installed version
     python export.py        # same thing without installing
 """
 
@@ -29,6 +32,7 @@ import re
 import shutil
 import sys
 import webbrowser
+from importlib import metadata
 
 # Session source: ~/.claude/projects by default, overridable (tests, CI)
 PROJECTS_DIR = os.environ.get("MEMORIUM_PROJECTS_DIR") or os.path.join(os.path.expanduser("~"), ".claude", "projects")
@@ -2366,6 +2370,13 @@ def init_settings(settings_path=None, assume_yes=False):
     return 0
 
 
+def package_version():
+    try:
+        return metadata.version("memorium-cli")
+    except metadata.PackageNotFoundError:  # run from a source checkout, not installed
+        return "dev"
+
+
 def main():
     # Windows console defaults to cp1252: force UTF-8 for accents and symbols.
     for stream in (sys.stdout, sys.stderr, sys.stdin):
@@ -2375,6 +2386,17 @@ def main():
             pass
 
     argv = sys.argv[1:]
+    if "-h" in argv or "--help" in argv:
+        print(__doc__.strip())
+        return
+    if "--version" in argv:
+        print(f"memorium {package_version()}")
+        return
+    # Any other dash argument would otherwise become the output directory.
+    unknown = [a for a in argv if a.startswith("-") and a not in ("--force", "--yes")]
+    if unknown:
+        print(f"  Unknown option: {unknown[0]}. See memorium --help")
+        sys.exit(2)
     if "archive" in argv:
         archive_sessions()
         return
