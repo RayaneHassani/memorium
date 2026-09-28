@@ -18,7 +18,7 @@ First public release.
 - Highlights in five colours and margin comments, with a per-session recap.
 - Logical organization: rename sessions and folders, move sessions between folders, without touching the source logs.
 - Dashboard with weekly activity and the latest sessions of every project.
-- `memorium serve` to serve the export on `http://localhost`, which unlocks annotations and organization.
+- `memorium serve` to serve the export on `http://localhost`, which unlocks renaming and moving sessions.
 - `memorium archive` to gzip every raw session outside `~/.claude`, incrementally.
 - `memorium restore` to put an archived session back so `claude --resume` works again.
 - `memorium init` to raise the session retention and archive every session as it ends.
