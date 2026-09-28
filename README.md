@@ -39,7 +39,7 @@ No server, no database, no account. One Python file, standard library only, and 
 
 `~/.claude/projects` belongs to Claude Code, which indexes it. Renaming a folder or moving a `.jsonl` file there would break `claude --resume`. So every rename and move in Memorium is **logical only**: it is recorded in a separate `export/data/metadata.json` and resolved at display time. The source of truth is never mutated, and every change is reversible. This is the core architectural trade-off, chosen deliberately over reorganizing files on disk.
 
-Writing that metadata needs the browser's File System Access API, which is disabled on `file://` pages. `memorium serve` serves the export over `http://localhost`, a *secure context*, with a plain static file server and no logic on the server side. Read-only browsing works from `file://` in any browser; annotations and organization need `memorium serve` and a Chromium browser (Chrome, Edge, Brave).
+Writing that metadata needs the browser's File System Access API, which is disabled on `file://` pages. `memorium serve` serves the export over `http://localhost`, a *secure context*, with a plain static file server and no logic on the server side. Read-only browsing, highlights and comments work from `file://` in any browser; highlights and comments are kept in the browser's local storage. Renaming and moving sessions needs `memorium serve` and a Chromium browser (Chrome, Edge, Brave). Design decisions are recorded in [docs/adr](https://github.com/RayaneHassani/memorium/tree/main/docs/adr).
 
 ## Archive and restore
 
