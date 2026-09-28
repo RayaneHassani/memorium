@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" width="800" alt="Memorium — Your reasoning, kept.">
+  <img src="https://raw.githubusercontent.com/RayaneHassani/memorium/main/docs/assets/banner.svg" width="800" alt="Memorium — Your reasoning, kept.">
 </p>
 
 # Memorium
@@ -9,7 +9,7 @@
 Six months from now, the commit will say *what* changed. Memorium shows you *why*: the session where the trade-off was weighed, the benchmark that settled it, the dead end you already tried.
 
 [![CI](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml/badge.svg)](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-566340)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-566340)](https://github.com/RayaneHassani/memorium/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 - **Find the why.** Full-text search across every session you ever ran, prebuilt at export time. Type `postgres`, land on the session where you chose it.
@@ -19,7 +19,7 @@ Six months from now, the commit will say *what* changed. Memorium shows you *why
 ## Quick start
 
 ```bash
-pipx install git+https://github.com/RayaneHassani/memorium
+pipx install memorium-cli
 memorium          # reads ~/.claude/projects, writes ./export, opens the browser
 memorium init     # once: stop the 30-day purge and archive every session as it ends
 ```
@@ -61,10 +61,10 @@ pipx upgrade memorium-cli && memorium
 
 ## By the numbers
 
-- **2,424 lines, one file, zero dependencies**: CLI, HTML generator, search index and viewer.
-- **61 sessions exported in 1.5 s** from a real multi-month history (718 raw log files scanned).
-- **241 KB** for the whole app shell, embedded fonts included.
-- **CI on Python 3.8 to 3.13** on every push: byte-compile and a smoke test on a fixture corpus.
+- **2,479 lines, one file, zero dependencies**: CLI, HTML generator, search index and viewer.
+- **68 sessions exported in 2 s** from a real multi-month history (872 raw log files scanned).
+- **243 KB** for the whole app shell, embedded fonts included.
+- **CI on Python 3.8 to 3.13** on every push: Ruff lint, byte-compile and a smoke test on a fixture corpus.
 
 ## Development
 
@@ -75,4 +75,4 @@ python -m unittest discover -s tests
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The embedded fonts (Fraunces, Atkinson Hyperlegible Next, JetBrains Mono) are under the SIL Open Font License, see [OFL.txt](OFL.txt).
+MIT, see [LICENSE](https://github.com/RayaneHassani/memorium/blob/main/LICENSE). The embedded fonts (Fraunces, Atkinson Hyperlegible Next, JetBrains Mono) are under the SIL Open Font License, see [OFL.txt](https://github.com/RayaneHassani/memorium/blob/main/OFL.txt).
