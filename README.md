@@ -9,6 +9,7 @@
 Six months from now, the commit will say *what* changed. Memorium shows you *why*: the session where the trade-off was weighed, the benchmark that settled it, the dead end you already tried.
 
 [![CI](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml/badge.svg)](https://github.com/RayaneHassani/memorium/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/memorium-cli?color=566340)](https://pypi.org/project/memorium-cli/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-566340)](https://github.com/RayaneHassani/memorium/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
